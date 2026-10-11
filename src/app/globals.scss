@@ -1,3 +1,317 @@
-// Tailwind v4 is loaded through Sass: Sass inlines tailwindcss/index.css
-// via @use, then PostCSS (@tailwindcss/postcss) compiles the result.
+// Melhor Preço · direcção visual "Etiqueta"
+//
+// Pipeline: Sass compiles this file first (the `@use` lines inline the plain
+// CSS of tailwindcss and tw-animate-css), then PostCSS runs
+// @tailwindcss/postcss over the result (see postcss.config.mjs). That is why
+// Tailwind directives (@theme, @custom-variant, @utility) work inside .scss.
 @use "tailwindcss";
+@import url("tw-animate-css");
+
+// Light only: the `dark:` variant only fires under an explicit `.dark`
+// ancestor, which this app never sets. Stops shadcn dark styles from leaking
+// in when the OS is in dark mode.
+@custom-variant dark (&:is(.dark *));
+
+// Radix state variants used by the shadcn (radix-nova) components.
+// Inlined from shadcn/tailwind.css so we don't ship the shadcn CLI as a dep.
+@custom-variant data-open {
+  &:where([data-state="open"]),
+  &:where([data-open]:not([data-open="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-closed {
+  &:where([data-state="closed"]),
+  &:where([data-closed]:not([data-closed="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-checked {
+  &:where([data-state="checked"]),
+  &:where([data-checked]:not([data-checked="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-unchecked {
+  &:where([data-state="unchecked"]),
+  &:where([data-unchecked]:not([data-unchecked="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-selected {
+  &:where([data-selected="true"]) {
+    @slot;
+  }
+}
+@custom-variant data-disabled {
+  &:where([data-disabled="true"]),
+  &:where([data-disabled]:not([data-disabled="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-active {
+  &:where([data-state="active"]),
+  &:where([data-active]:not([data-active="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-horizontal {
+  &:where([data-orientation="horizontal"]) {
+    @slot;
+  }
+}
+@custom-variant data-vertical {
+  &:where([data-orientation="vertical"]) {
+    @slot;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tokens
+// ---------------------------------------------------------------------------
+:root {
+  // Brand (BRIEF §7)
+  --paper: #f3f4f1;
+  --surface: #ffffff;
+  --ink: #111311;
+  --ink-2: #4a4f4a;
+  --line: #daddd6;
+  --tag: #ffd21f;
+  --tag-deep: #f2c200; // pressed/hover state of tag surfaces (still ink text)
+
+  // State colours: discreet, badges only
+  --success: #1f7a4d;
+  --warning: #b26b00;
+  --error: #b3261e;
+  --info: #2f5bd3;
+
+  // Supporting neutrals derived from the palette
+  --paper-2: #e9ebe6; // sunken areas, secondary fills
+  --field: #9da297; // input borders (form control boundary)
+
+  // shadcn semantic mapping
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--surface);
+  --secondary: var(--paper-2);
+  --secondary-foreground: var(--ink);
+  --muted: var(--paper-2);
+  --muted-foreground: var(--ink-2);
+  --accent: var(--tag);
+  --accent-foreground: var(--ink);
+  --destructive: var(--error);
+  --destructive-foreground: var(--surface);
+  --border: var(--line);
+  --input: var(--field);
+  --ring: var(--ink);
+  --radius: 0.75rem; // 12px: cards and inputs
+
+  // Shadows: almost none, tinted with ink
+  --shadow-tint: 17 19 17;
+  --shadow-soft: 0 1px 2px rgb(var(--shadow-tint) / 0.05), 0 4px 12px -4px rgb(var(--shadow-tint) / 0.08);
+  --shadow-lift: 0 2px 4px rgb(var(--shadow-tint) / 0.05), 0 12px 32px -12px rgb(var(--shadow-tint) / 0.18);
+}
+
+@theme inline {
+  // Brand colours → bg-paper, text-ink, bg-tag, border-line, text-ink-2 …
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-line: var(--line);
+  --color-tag: var(--tag);
+  --color-tag-deep: var(--tag-deep);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+
+  // shadcn colours
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  // Type (next/font variables set on <html>)
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  // Radius scale: rounded-lg = 12px (cards, inputs). Buttons/badges use rounded-full.
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+
+  --shadow-soft: var(--shadow-soft);
+  --shadow-lift: var(--shadow-lift);
+}
+
+@theme {
+  // Motion (Emil Kowalski): strong ease-out, 150–250ms
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --default-transition-duration: 200ms;
+  --default-transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
+
+// Numbers that line up like a talão (prices, IDs, counts).
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+// Comfortable reading measure for body copy.
+@utility measure {
+  max-width: 65ch;
+}
+
+// Tactile press for custom pressables (Button already has it).
+@utility press {
+  transition-property: transform;
+  transition-duration: 160ms;
+  transition-timing-function: var(--ease-out);
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+// Hover that only applies on devices with a real pointer.
+@custom-variant hover-fine {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      @slot;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Base
+// ---------------------------------------------------------------------------
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    color-scheme: light;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    scrollbar-color: var(--field) transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "ss01" 1, "cv11" 1;
+    text-rendering: optimizeLegibility;
+    caret-color: var(--ink);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  h1 {
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+  }
+
+  h2 {
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background: var(--tag);
+    color: var(--ink);
+  }
+
+  a {
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+  }
+
+  code,
+  kbd,
+  samp,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+
+  // Inputs at 16px on mobile so iOS/Android never zoom the page on focus.
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+
+  @media (min-width: 768px) {
+    input,
+    select,
+    textarea {
+      font-size: inherit;
+    }
+  }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
+
+// Sonner toast skin
+.cn-toast {
+  font-family: var(--font-sans);
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow-lift) !important;
+}
+
+// Reduced motion: drop movement, keep instant state changes.
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,40 @@
+// Shared Sass helpers for *.module.scss files.
+// Import with a relative path, e.g. `@use "../styles/mixins" as *;`
+
+$ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+$ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+$dur-fast: 150ms;
+$dur: 200ms;
+$dur-slow: 250ms;
+
+// Hover effects only on devices that really hover (no sticky hover on touch).
+@mixin hover {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      @content;
+    }
+  }
+}
+
+// Tactile press feedback for anything pressable.
+@mixin press($scale: 0.97) {
+  transition: transform $dur-fast $ease-out;
+
+  &:active {
+    transform: scale($scale);
+  }
+}
+
+@mixin reduced-motion {
+  @media (prefers-reduced-motion: reduce) {
+    @content;
+  }
+}
+
+// Dashed "talão" rule drawn with a gradient so dash length is controllable.
+@mixin dashed-rule($color: var(--line), $dash: 6px, $gap: 5px, $thickness: 1px) {
+  background-image: linear-gradient(to right, $color 0 $dash, transparent $dash ($dash + $gap));
+  background-size: ($dash + $gap) $thickness;
+  background-repeat: repeat-x;
+  height: $thickness;
+}
