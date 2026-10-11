@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
-import { AppShell, PageHeader } from "@/components/app-shell";
+import { AppShell } from "@/components/app-shell";
+import { TasksView } from "@/components/agente/tasks-view";
 
-export const metadata: Metadata = { title: "Tarefas do agente" };
+export const metadata: Metadata = {
+  title: "Tarefas do agente",
+  description: "Pedidos atribuídos, consultas em curso e pagamentos por confirmar.",
+};
 
 export default function AgentePage() {
   return (
     <AppShell role="agente">
-      <PageHeader title="Tarefas" description="Em construção." />
+      <TasksView />
     </AppShell>
   );
 }
