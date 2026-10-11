@@ -1,11 +1,18 @@
 // Melhor Preço · direcção visual "Etiqueta"
 //
-// Pipeline: Sass compiles this file first (the `@use` lines inline the plain
-// CSS of tailwindcss and tw-animate-css), then PostCSS runs
-// @tailwindcss/postcss over the result (see postcss.config.mjs). That is why
-// Tailwind directives (@theme, @custom-variant, @utility) work inside .scss.
+// Pipeline: Sass compiles this file first (`@use "tailwindcss"` inlines
+// Tailwind's plain CSS), then PostCSS runs @tailwindcss/postcss over the
+// result (see postcss.config.mjs). That is why Tailwind directives (@theme,
+// @custom-variant, @utility) work inside .scss.
 @use "tailwindcss";
-@import url("tw-animate-css");
+
+// tw-animate-css cannot go through Sass: its `--value(...)` utilities are not
+// valid SCSS. An @import ending in `.css` is left untouched by Sass, and the
+// Tailwind PostCSS plugin then inlines and compiles it. The path is relative
+// (not the bare package name) because Turbopack's dev server tries to resolve
+// a bare `tw-animate-css` itself and fails; the package only exports "." with
+// a `style` condition, so a bare subpath would not resolve either.
+@import "../../node_modules/tw-animate-css/dist/tw-animate.css";
 
 // Light only: the `dark:` variant only fires under an explicit `.dark`
 // ancestor, which this app never sets. Stops shadcn dark styles from leaking
