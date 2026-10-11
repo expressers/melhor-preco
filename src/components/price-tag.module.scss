@@ -1,0 +1,78 @@
+// Price tag: pointed left end with a punched hole, rounded right corners.
+// The hole is a real hole (mask), so whatever is behind shows through.
+.tag {
+  --notch: 0.85em; // depth of the pointed end
+  --hole: 0.2em; // hole radius
+
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.28em;
+  padding: 0.32em 0.75em 0.32em calc(var(--notch) + 0.62em);
+  border-radius: 0 0.3em 0.3em 0;
+  background: var(--tag);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  clip-path: polygon(var(--notch) 0, 100% 0, 100% 100%, var(--notch) 100%, 0 50%);
+  mask: radial-gradient(
+    circle at calc(var(--notch) * 0.95) 50%,
+    transparent var(--hole),
+    #000 calc(var(--hole) + 0.5px)
+  );
+}
+
+.ink {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.muted {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.currency {
+  font-size: 0.62em;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.sm {
+  font-size: 0.8125rem;
+}
+
+.md {
+  font-size: 1.0625rem;
+}
+
+.lg {
+  font-size: 1.75rem;
+}
+
+.xl {
+  font-size: clamp(2rem, 7vw, 2.75rem);
+}
+
+// Tiny tag used as the brand mark next to the wordmark.
+.mark {
+  --notch: 0.42em;
+  --hole: 0.11em;
+
+  display: inline-block;
+  width: 1.45em;
+  height: 0.9em;
+  border-radius: 0 0.16em 0.16em 0;
+  background: var(--tag);
+  clip-path: polygon(var(--notch) 0, 100% 0, 100% 100%, var(--notch) 100%, 0 50%);
+  mask: radial-gradient(
+    circle at calc(var(--notch) * 0.95) 50%,
+    transparent var(--hole),
+    #000 calc(var(--hole) + 0.5px)
+  );
+  transform: rotate(-8deg);
+}

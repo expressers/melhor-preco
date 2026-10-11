@@ -1,0 +1,30 @@
+@use "../styles/mixins" as *;
+
+// Talão: white slip, dashed rules, perforated (zigzag) bottom edge.
+// drop-shadow sits on the wrapper because the mask would clip a box-shadow.
+.wrap {
+  filter: drop-shadow(0 1px 1px rgb(17 19 17 / 0.06)) drop-shadow(0 6px 14px rgb(17 19 17 / 0.06));
+}
+
+.receipt {
+  --zz: 12px; // tooth width
+
+  background: var(--surface);
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding-bottom: calc(var(--zz) / 2 + 1rem);
+  mask:
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / var(--zz) 100%;
+}
+
+.rule {
+  @include dashed-rule(var(--field), 5px, 4px, 1px);
+  width: 100%;
+}
+
+.leader {
+  flex: 1 1 auto;
+  min-width: 1rem;
+  align-self: end;
+  margin-bottom: 0.35em;
+  border-bottom: 1px dotted var(--line);
+}
