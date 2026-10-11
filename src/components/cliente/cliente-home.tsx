@@ -86,7 +86,7 @@ function Home({ client }: { client: Client }) {
         <EmptyState
           icon={<MagnifyingGlassIcon />}
           title="Ainda não fez nenhuma consulta"
-          description="Escolha o produto e as superfícies comerciais. Vê o preço da consulta antes de confirmar, a partir de 600 Kz."
+          description="Escolha o produto e as superfícies comerciais. Vê o preço da consulta antes de confirmar, a partir de 600 Kz."
           action={
             <Button asChild variant="outline">
               <Link href={routes.cliente.nova}>Fazer a primeira consulta</Link>

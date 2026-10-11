@@ -73,7 +73,7 @@ export function TasksView() {
         <EmptyState
           icon={<ClipboardTextIcon />}
           title="Sem tarefas por agora"
-          description="Quando a administração lhe atribuir um pedido, ele aparece aqui e recebe uma notificação. Cada consulta rende-lhe pelo menos 400 Kz."
+          description="Quando a administração lhe atribuir um pedido, ele aparece aqui e recebe uma notificação. Cada consulta rende-lhe pelo menos 400 Kz."
           action={
             <Button asChild variant="outline">
               <Link href={routes.agente.historico}>Ver histórico</Link>

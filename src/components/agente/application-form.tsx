@@ -126,7 +126,7 @@ function ApplicationForm({ onDone }: { onDone: (a: Agent) => void }) {
       <div className="mb-8 flex flex-col gap-2">
         <h1 className="text-[1.75rem] leading-tight sm:text-3xl">Ser agente Melhor Preço</h1>
         <p className="measure text-[0.9375rem] text-ink-2">
-          Já conhece as lojas do seu centro comercial? Ganhe pelo menos 400 Kz por cada consulta de preços que fizer
+          Já conhece as lojas do seu centro comercial? Ganhe pelo menos 400 Kz por cada consulta de preços que fizer
           para os nossos clientes. Preencha os dados e a equipa entra em contacto.
         </p>
       </div>

@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatDateTime, formatKz } from "@/lib/format";
+import { formatDateTime, formatKz, formatPhone } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import type { Agent, ServiceRequest } from "@/lib/types";
 import styles from "./agente.module.scss";
@@ -54,7 +54,7 @@ export function AwaitingPayment({ request, agent }: { request: ServiceRequest; a
         <PriceTag amount={request.price} size="xl" label="Valor a receber" />
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 pt-1 text-sm">
           <dt className="text-ink-2">Multicaixa Express</dt>
-          <dd className="font-mono text-ink tabular">{agent.paymentInfo.phone}</dd>
+          <dd className="font-mono text-ink tabular">{formatPhone(agent.paymentInfo.phone)}</dd>
           <dt className="text-ink-2">Titular</dt>
           <dd className="text-ink">{agent.paymentInfo.holder}</dd>
         </dl>

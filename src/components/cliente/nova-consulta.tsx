@@ -63,7 +63,7 @@ const COPY = {
     description: "Geleira de duas portas",
     brandLabel: "Marcas preferidas",
     brand: "Hisense, LG ou Samsung",
-    features: "Entre 300 e 400 litros, até 450 000 Kz",
+    features: "Entre 300 e 400 litros, até 450 000 Kz",
   },
 } as const;
 
@@ -649,7 +649,7 @@ function Confirm({
 
       <div className="flex items-center justify-between gap-4 rounded-lg bg-paper-2 px-4 py-4">
         <p className="text-[0.8125rem] leading-relaxed text-ink-2">
-          Paga directamente ao agente por Multicaixa Express, depois da resposta. Mínimo de 600 Kz por consulta.
+          Paga directamente ao agente por Multicaixa Express, depois da resposta. Mínimo de {formatKz(pricing.minimum)} por consulta.
         </p>
         <PriceTag amount={q.price} size="lg" label="Valor da consulta" className="shrink-0" />
       </div>

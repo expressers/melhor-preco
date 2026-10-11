@@ -114,9 +114,12 @@ export function ViewAsSwitcher({ className }: { className?: string }) {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={() => {
+            // Stay in the area being viewed: reset() would fall back to "cliente".
+            const role = session.viewAs;
             reset();
+            setViewAs(role);
             toast.success("Dados de demonstração repostos.");
-            router.push(ROLE[useStore.getState().session.viewAs].home);
+            router.push(ROLE[role].home);
           }}
         >
           <ArrowCounterClockwiseIcon />

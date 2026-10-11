@@ -11,6 +11,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import { getSeed, type SeedState } from "./data";
 import { formatKz } from "./format";
+import { REQUEST_STATUS } from "./labels";
 import { ADMIN_NAME } from "./mock";
 import { computePrice, sanitizePricing, type PriceQuote } from "./pricing";
 import { computeIncomplete, isAgentEligible, nextRequestId } from "./rules";
@@ -540,7 +541,7 @@ export const useStore = create<Store>()(
                 userId: r.clientId,
                 requestId,
                 title: "Estado do pedido actualizado",
-                body: `${requestId} está agora em: ${status.replace(/_/g, " ")}.`,
+                body: `${requestId} está agora em: ${REQUEST_STATUS[status].label}.`,
               }),
             ],
           );
