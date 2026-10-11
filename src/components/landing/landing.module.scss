@@ -1,0 +1,150 @@
+@use "../../styles/mixins" as *;
+
+// ---------------------------------------------------------------------------
+// Hero: the example talão rises once on load and the 600 Kz tag swings onto it.
+// One-time entrance, transform/opacity only; reduced motion skips movement.
+// ---------------------------------------------------------------------------
+.heroSlip {
+  animation: slip-in 560ms $ease-out both;
+  animation-delay: 80ms;
+}
+
+.heroTag {
+  position: absolute;
+  top: -1.1rem;
+  right: -0.25rem;
+  z-index: 1;
+  transform: rotate(-7deg);
+  transform-origin: 85% 0;
+  animation: tag-swing 640ms $ease-out both;
+  animation-delay: 360ms;
+
+  @media (min-width: 640px) {
+    right: -1.25rem;
+  }
+}
+
+@keyframes slip-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tag-swing {
+  from {
+    opacity: 0;
+    transform: rotate(-16deg) translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-7deg);
+  }
+}
+
+@include reduced-motion {
+  .heroSlip,
+  .heroTag {
+    animation: none;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// "Como funciona" rail: dashed talão rule with square ticks.
+// Vertical on mobile, horizontal from md.
+// ---------------------------------------------------------------------------
+.rail {
+  position: relative;
+  display: grid;
+  gap: 2rem;
+  padding-left: 1.75rem;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0.5rem;
+    bottom: 0.5rem;
+    left: 0.3125rem;
+    width: 1px;
+    background-image: linear-gradient(to bottom, var(--field) 0 5px, transparent 5px 9px);
+    background-size: 1px 9px;
+    background-repeat: repeat-y;
+  }
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2rem;
+    padding-left: 0;
+    padding-top: 2.25rem;
+
+    &::before {
+      top: 0.3125rem;
+      bottom: auto;
+      left: 0;
+      right: 0;
+      width: auto;
+      @include dashed-rule(var(--field), 5px, 4px, 1px);
+    }
+  }
+}
+
+.step {
+  position: relative;
+}
+
+.tick {
+  position: absolute;
+  top: 0.3rem;
+  left: -1.75rem;
+  width: 0.6875rem;
+  height: 0.6875rem;
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+
+  @media (min-width: 768px) {
+    top: -2.25rem;
+    left: 0;
+  }
+}
+
+.tickLast {
+  background: var(--tag);
+}
+
+// ---------------------------------------------------------------------------
+// FAQ: native <details>, caret turns on open. No height animation.
+// ---------------------------------------------------------------------------
+.faqItem {
+  summary {
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+  }
+
+  &[open] .caret {
+    transform: rotate(45deg);
+  }
+}
+
+.caret {
+  transition: transform $dur $ease-out;
+}
+
+// Inline arrow links nudge on real hover only.
+.arrowLink {
+  .arrow {
+    transition: transform $dur $ease-out;
+  }
+
+  @include hover {
+    .arrow {
+      transform: translateX(3px);
+    }
+  }
+}
