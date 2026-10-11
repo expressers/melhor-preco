@@ -88,7 +88,7 @@
 
   // State colours: discreet, badges only
   --success: #1f7a4d;
-  --warning: #b26b00;
+  --warning: #965a00; // BRIEF #B26B00 is 3.8:1 on paper; darkened to pass AA (5:1)
   --error: #b3261e;
   --info: #2f5bd3;
 
@@ -178,7 +178,7 @@
 }
 
 @theme {
-  // Motion (Emil Kowalski): strong ease-out, 150–250ms
+  // Motion (Emil Kowalski): strong ease-out, 150-250ms
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);

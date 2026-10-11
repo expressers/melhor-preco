@@ -13,7 +13,7 @@ The visual world comes from the most universal object in any market: **the price
 | `--line` | `#DADDD6` | borders, rules |
 | `--tag` | `#FFD21F` | the single accent: price tags, the one primary CTA per screen, highlights. Always with `--ink` text. Never yellow text on white |
 | `--tag-deep` | `#F2C200` | pressed/hover of tag surfaces |
-| `--success` / `--warning` / `--error` / `--info` | `#1F7A4D` / `#B26B00` / `#B3261E` / `#2F5BD3` | state colours, **only in badges** (10% tint fill + coloured text) |
+| `--success` / `--warning` / `--error` / `--info` | `#1F7A4D` / `#965A00` / `#B3261E` / `#2F5BD3` | state colours, **only in badges** (10% tint fill + coloured text). Warning is darkened from the BRIEF `#B26B00` (3.8:1 on paper) to pass WCAG AA |
 
 Tailwind names: `bg-paper`, `bg-paper-2`, `bg-surface`, `text-ink`, `text-ink-2`, `border-line`, `bg-tag`, `text-success` etc.
 
