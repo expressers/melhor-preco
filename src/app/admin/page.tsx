@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import { AppShell, PageHeader } from "@/components/app-shell";
+import { AdminOverview } from "@/components/admin/overview";
+import { AppShell } from "@/components/app-shell";
 
-export const metadata: Metadata = { title: "Administração" };
+export const metadata: Metadata = { title: "Visão geral · Administração" };
 
 export default function AdminPage() {
   return (
     <AppShell role="admin">
-      <PageHeader title="Visão geral" description="Em construção." />
+      <AdminOverview />
     </AppShell>
   );
 }
