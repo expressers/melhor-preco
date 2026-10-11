@@ -52,7 +52,7 @@ export function Hero({ minimum }: { minimum: number }) {
       <figure className="relative mx-auto w-full max-w-[26rem] lg:mr-0">
         <div className={styles.heroSlip}>
           <PriceTag amount={minimum} size="lg" label="Valor da consulta" className={styles.heroTag} />
-          <Receipt title="Exemplo de resposta" meta="ilustrativo">
+          <Receipt title="Exemplo ilustrativo">
             <div className="flex items-start gap-3">
               <ProductPhoto
                 src={PHOTOS.fridge}
