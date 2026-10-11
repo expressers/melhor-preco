@@ -1,0 +1,3 @@
+// Tailwind v4 is loaded through Sass: Sass inlines tailwindcss/index.css
+// via @use, then PostCSS (@tailwindcss/postcss) compiles the result.
+@use "tailwindcss";

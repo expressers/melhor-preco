@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: melhor-preco
+    runtime: static
+    # Render static sites ship with Node/npm but not Bun: install Bun first.
+    buildCommand: npm install -g bun && bun install --frozen-lockfile && bun run build
+    staticPublishPath: ./out
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /_next/static/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
