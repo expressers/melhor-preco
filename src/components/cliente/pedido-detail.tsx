@@ -1,28 +1,45 @@
 "use client";
 
-import { ArrowLeftIcon, CopyIcon, FileMagnifyingGlassIcon, HourglassIcon } from "@phosphor-icons/react";
+import {
+  ArrowClockwiseIcon,
+  ArrowLeftIcon,
+  CheckIcon,
+  CopyIcon,
+  FileMagnifyingGlassIcon,
+  HourglassIcon,
+  PlayIcon,
+} from "@phosphor-icons/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
+import { useNow } from "@/components/agente/use-now";
 import { EmptyState } from "@/components/empty-state";
 import { PriceTag } from "@/components/price-tag";
 import { ProductPhoto } from "@/components/product-photo";
 import { Receipt, ReceiptNote, ReceiptRow, ReceiptRule, ReceiptTotal } from "@/components/receipt";
-import { StatusBadge } from "@/components/status-badge";
+import {
+  ClientKindBadge,
+  ReferenceStatusBadge,
+  RequestKindBadge,
+  StatusBadge,
+  ToneBadge,
+} from "@/components/status-badge";
 import { Timeline } from "@/components/timeline";
 import { Button } from "@/components/ui/button";
-import { formatReference, isReferenceExpired } from "@/lib/finance";
+import { formatReference, referenceDisplayStatus } from "@/lib/finance";
 import { formatDateTime, formatKz } from "@/lib/format";
 import { CATEGORY_LABEL, PRIORITY } from "@/lib/labels";
+import { requestKindLabel } from "@/lib/pricing";
 import { routes } from "@/lib/routes";
-import { resultsUnlocked, requestTitle, formatVariations } from "@/lib/rules";
+import { clientDisplayName, formatVariations, requestTitle, resultsUnlocked } from "@/lib/rules";
 import { useRequest, useStore } from "@/lib/store";
-import type { Agent, Client, RequestStatus, ServiceRequest, Surface } from "@/lib/types";
+import type { Agent, Client, MulticaixaReference, RequestStatus, ServiceRequest, Surface } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 import { ClientGate } from "./client-gate";
 import { LockedResults } from "./locked-results";
 import { RequestActions } from "./request-actions";
-import { surfaceNames, useSurfaceMap } from "./request-row";
+import { useSurfaceMap } from "./request-row";
 import { ResultsBoard } from "./results-board";
 
 export function PedidoDetail() {
@@ -66,7 +83,9 @@ function Detail({ id, client }: { id: string | null; client: Client }) {
   }
 
   const agent = agents.find((a) => a.id === request.agentId);
+  const surface = surfaces.get(request.surfaceId);
   const unlocked = resultsUnlocked(request);
+  const n = request.items.length;
 
   return (
     <div className="flex flex-col gap-10">
@@ -75,10 +94,12 @@ function Detail({ id, client }: { id: string | null; client: Client }) {
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <span className="font-mono text-sm font-medium text-ink tabular">{request.id}</span>
           <StatusBadge status={request.status} />
+          <RequestKindBadge kind={request.kind} />
         </div>
         <h1 className="measure text-[1.75rem] sm:text-[2.25rem]">{requestTitle(request)}</h1>
         <p className="text-sm text-ink-2">
-          {CATEGORY_LABEL[request.items[0].category]}. {surfaceNames([request.surfaceId], surfaces)}. Submetido a{" "}
+          {requestKindLabel(n)}, {n} {n === 1 ? "item" : "itens"}. {surface?.name ?? request.surfaceId}
+          {surface && `, ${surface.area}`}. Submetido a{" "}
           <time dateTime={request.createdAt} className="font-mono tabular">
             {formatDateTime(request.createdAt)}
           </time>
@@ -90,9 +111,11 @@ function Detail({ id, client }: { id: string | null; client: Client }) {
         <div className="flex min-w-0 flex-col gap-6">
           <Progress status={request.status} />
           <NextStep request={request} agent={agent} />
-          {request.status === "resposta_submetida" && <PayReference request={request} />}
+          {request.status === "resposta_submetida" && request.reference && (
+            <PayReference request={request} reference={request.reference} />
+          )}
         </div>
-        <RequestTalao request={request} surfaces={surfaces} />
+        <RequestTalao request={request} client={client} surface={surface} />
       </div>
 
       <section aria-labelledby="h-resultados" className="flex flex-col gap-4">
@@ -101,10 +124,10 @@ function Detail({ id, client }: { id: string | null; client: Client }) {
             Resultados
           </h2>
           {unlocked && (
-            <p className="text-sm text-ink-2">Organizados por superfície. Compare preço, loja e disponibilidade.</p>
+            <p className="text-sm text-ink-2">Organizados por item. Compare preço, loja e disponibilidade.</p>
           )}
         </div>
-        <Results request={request} surfaces={surfaces} unlocked={unlocked} />
+        <Results request={request} surface={surface} unlocked={unlocked} />
       </section>
 
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
@@ -116,18 +139,10 @@ function Detail({ id, client }: { id: string | null; client: Client }) {
             <Timeline events={request.timeline} />
           </div>
         </section>
-        {request.status !== "cancelado" && request.status !== "concluido" && (
+        {request.status !== "cancelado" && (
           <section aria-labelledby="h-accoes" className="flex flex-col gap-4">
             <h2 id="h-accoes" className="text-xl">
-              Acções
-            </h2>
-            <RequestActions request={request} />
-          </section>
-        )}
-        {request.status === "concluido" && (
-          <section aria-labelledby="h-accoes" className="flex flex-col gap-4">
-            <h2 id="h-accoes" className="text-xl">
-              Algo correu mal?
+              {request.status === "concluido" ? "Algo correu mal?" : "Acções"}
             </h2>
             <RequestActions request={request} />
           </section>
@@ -137,21 +152,22 @@ function Detail({ id, client }: { id: string | null; client: Client }) {
   );
 }
 
-const STEPS: { label: string; statuses: RequestStatus[] }[] = [
-  { label: "Submetido", statuses: ["submetido", "aguarda_atribuicao"] },
-  { label: "Agente", statuses: ["agente_atribuido"] },
-  { label: "No terreno", statuses: ["em_consulta"] },
-  { label: "Resposta", statuses: ["resposta_submetida"] },
-  { label: "Pago", statuses: ["pagamento_confirmado"] },
-  { label: "Concluída", statuses: ["concluido"] },
+const STEPS: { label: string; status: RequestStatus }[] = [
+  { label: "Submetido", status: "submetido" },
+  { label: "Em fila", status: "aguarda_atribuicao" },
+  { label: "Agente", status: "agente_atribuido" },
+  { label: "No terreno", status: "em_consulta" },
+  { label: "A pagar", status: "resposta_submetida" },
+  { label: "Pago", status: "pagamento_confirmado" },
+  { label: "Concluída", status: "concluido" },
 ];
 
-/** Where the request is, as a strip of six marks. Hidden for cancelled requests. */
+/** Where the request is, as a strip of seven marks. Hidden for cancelled requests. */
 function Progress({ status }: { status: RequestStatus }) {
   if (status === "cancelado") return null;
-  const at = STEPS.findIndex((s) => s.statuses.includes(status));
+  const at = STEPS.findIndex((s) => s.status === status);
   return (
-    <ol className="grid grid-cols-6 gap-1.5" aria-label={`Passo ${at + 1} de ${STEPS.length}`}>
+    <ol className="grid grid-cols-7 gap-1" aria-label={`Passo ${at + 1} de ${STEPS.length}`}>
       {STEPS.map((s, i) => (
         <li key={s.label} className="flex min-w-0 flex-col gap-1.5" aria-current={i === at ? "step" : undefined}>
           <span
@@ -160,7 +176,7 @@ function Progress({ status }: { status: RequestStatus }) {
           />
           <span
             className={cn(
-              "truncate text-[0.6875rem] sm:text-xs",
+              "truncate text-[0.625rem] sm:text-xs",
               i === at ? "font-semibold text-ink" : i < at ? "text-ink" : "text-ink-2",
             )}
           >
@@ -175,11 +191,12 @@ function Progress({ status }: { status: RequestStatus }) {
 function NextStep({ request, agent }: { request: ServiceRequest; agent?: Agent }) {
   const who = agent ? `O agente ${agent.code}` : "O agente";
   const text: Record<RequestStatus, string> = {
-    submetido: "Recebemos o pedido. Vamos atribuí-lo a um agente credenciado da superfície escolhida.",
-    aguarda_atribuicao: "À espera de um agente disponível nesta superfície. Recebe um aviso logo que for atribuído.",
+    submetido: "Recebemos o pedido. Vai para a fila da superfície escolhida.",
+    aguarda_atribuicao:
+      "O operador da superfície vai atribuir o pedido a um agente credenciado. Recebe um aviso logo que for atribuído.",
     agente_atribuido: `${who} recebeu o pedido e vai aceitá-lo em breve.`,
     em_consulta: `${who} está no terreno a recolher preços, disponibilidade e fotografias.`,
-    resposta_submetida: `${who} já respondeu. Pague ${formatKz(request.amounts.gross)} com a referência Multicaixa para desbloquear os resultados.`,
+    resposta_submetida: `${who} já respondeu. Pague ${formatKz(request.amounts.gross)} à plataforma com a referência Multicaixa abaixo. Os resultados abrem quando o pagamento for confirmado.`,
     pagamento_confirmado: "A plataforma confirmou o pagamento. Os resultados estão disponíveis abaixo.",
     concluido: "Consulta concluída. Os resultados ficam guardados aqui.",
     cancelado: `Pedido cancelado.${request.cancelReason ? ` Motivo: ${request.cancelReason}.` : ""}`,
@@ -187,64 +204,133 @@ function NextStep({ request, agent }: { request: ServiceRequest; agent?: Agent }
   return <p className="measure text-[0.9375rem] leading-relaxed text-ink">{text[request.status]}</p>;
 }
 
-/**
- * TEMPORARY (domain step): Multicaixa reference to pay the platform (CHANGES §5).
- * The cliente worker owns the final talão; the demo button stays.
- */
-function PayReference({ request }: { request: ServiceRequest }) {
-  const ref = request.reference;
-  if (!ref) return null;
-  const expired = isReferenceExpired(ref);
+/** Copy-to-clipboard icon button that confirms with a check for a moment. */
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [done, setDone] = useState(false);
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(ref.reference);
-      toast.success("Referência copiada");
+      await navigator.clipboard.writeText(value);
+      setDone(true);
+      toast.success(`${label} copiad${label === "Entidade" || label === "Referência" ? "a" : "o"}`);
+      window.setTimeout(() => setDone(false), 1600);
     } catch {
-      toast.error("Não foi possível copiar. Escreva a referência manualmente.");
+      toast.error("Não foi possível copiar. Escreva o valor manualmente.");
     }
   };
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      onClick={copy}
+      aria-label={`Copiar ${label.toLowerCase()}`}
+      className="-my-2 -mr-3 shrink-0 text-ink-2"
+    >
+      {done ? <CheckIcon weight="bold" className="text-success" /> : <CopyIcon />}
+    </Button>
+  );
+}
+
+function RefLine({ label, value, copy, big }: { label: string; value: string; copy: string; big?: boolean }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-24 shrink-0 text-ink-2">{label}</span>
+      <span className={cn("min-w-0 flex-1 font-mono text-ink tabular", big ? "text-xl font-semibold" : "text-base")}>
+        {value}
+      </span>
+      <CopyButton value={copy} label={label} />
+    </div>
+  );
+}
+
+/** Multicaixa reference to pay the platform (CHANGES-v2 §5). Demo values. */
+function PayReference({ request, reference: ref }: { request: ServiceRequest; reference: MulticaixaReference }) {
+  const now = useNow(60_000);
+  const status = referenceDisplayStatus(ref, now);
+  const expired = status === "expirada";
+
   const simulate = () => {
     const res = useStore.getState().confirmReferencePayment(request.id, "demo");
     if (!res.ok) toast.error(res.error);
-    else toast.success("Pagamento simulado: resultados desbloqueados.");
+    else toast.success("Pagamento confirmado (simulação). Resultados desbloqueados.");
+  };
+  const regenerate = () => {
+    const res = useStore.getState().regenerateReference(request.id);
+    if (!res.ok) toast.error(res.error);
+    else toast.success("Nova referência gerada.");
   };
 
   return (
-    <Receipt title="Pagar por referência Multicaixa" meta={request.id} className="max-w-xl">
-      <div className="flex flex-col gap-1 py-1">
-        <span className="text-ink-2">Montante</span>
-        <PriceTag amount={ref.amount} size="xl" label="Montante a pagar" className="self-start" />
+    <section aria-labelledby="h-pagar" className="flex max-w-xl flex-col gap-3">
+      <h2 id="h-pagar" className="sr-only">
+        Pagar por referência Multicaixa
+      </h2>
+      <Receipt
+        title="Pagamento por referência"
+        meta={
+          <span className="inline-flex items-center gap-2">
+            <ReferenceStatusBadge status={status} />
+            {ref.demo && <ToneBadge tone="neutral">Demonstração</ToneBadge>}
+          </span>
+        }
+      >
+        <p className="text-ink">
+          Pague em qualquer ATM ou no Multicaixa Express: <span className="font-medium">Pagamentos</span>, depois{" "}
+          <span className="font-medium">Pagamento por referência</span>.
+        </p>
+        <ReceiptRule />
+        <div className={cn("flex flex-col gap-3", expired && "opacity-50")}>
+          <RefLine label="Entidade" value={ref.entity} copy={ref.entity} />
+          <RefLine label="Referência" value={formatReference(ref.reference)} copy={ref.reference} big />
+          <div className="flex items-center gap-3">
+            <span className="w-24 shrink-0 text-ink-2">Montante</span>
+            <PriceTag amount={ref.amount} size="lg" label="Montante a pagar" className="flex-1 self-start" />
+            <CopyButton value={String(ref.amount)} label="Montante" />
+          </div>
+        </div>
+        <ReceiptRule />
+        <ReceiptRow
+          label={expired ? "Expirou a" : "Válida até"}
+          value={formatDateTime(ref.expiresAt)}
+          className={expired ? "text-error" : undefined}
+        />
+        <ReceiptRow label="Pedido" value={request.id} />
+        <ReceiptRule />
+        <ReceiptNote>
+          O pagamento é feito à plataforma Melhor Preço, nunca ao agente. Os resultados abrem quando a plataforma
+          confirmar o pagamento. Entidade e referência fictícias, só para demonstração.
+        </ReceiptNote>
+      </Receipt>
+      <div className="flex flex-wrap gap-2">
+        {expired && (
+          <Button variant="default" onClick={regenerate}>
+            <ArrowClockwiseIcon data-icon="inline-start" />
+            Gerar nova referência
+          </Button>
+        )}
+        {ref.demo && !expired && (
+          <Button variant="outline" onClick={simulate}>
+            <PlayIcon data-icon="inline-start" />
+            Simular pagamento da referência
+          </Button>
+        )}
       </div>
-      <ReceiptRule />
-      <ReceiptRow label="Entidade" value={ref.entity} />
-      <div className="flex items-center gap-2">
-        <span className="text-ink-2">Referência</span>
-        <span aria-hidden className="h-px flex-1 self-end border-b border-dotted border-line" style={{ marginBottom: "0.35em" }} />
-        <span className="font-mono text-base font-semibold text-ink tabular">{formatReference(ref.reference)}</span>
-        <Button variant="ghost" size="icon-sm" onClick={copy} aria-label="Copiar referência" className="-my-1 -mr-2 size-11">
-          <CopyIcon />
-        </Button>
-      </div>
-      <ReceiptRow label="Válida até" value={expired ? "Expirada" : formatDateTime(ref.expiresAt)} />
-      <ReceiptRule />
-      <ReceiptNote>
-        Pague em qualquer ATM ou no Multicaixa Express. Os resultados abrem quando a plataforma confirmar o pagamento.
-        Valores de demonstração: esta entidade e referência são fictícias.
-      </ReceiptNote>
-      <Button variant="outline" onClick={simulate} className="mt-2 self-start">
-        Simular pagamento da referência (demonstração)
-      </Button>
-    </Receipt>
+      {ref.demo && !expired && (
+        <p className="text-[0.8125rem] text-ink-2">
+          Só existe nesta demonstração: faz de conta que o banco confirmou o pagamento.
+        </p>
+      )}
+    </section>
   );
 }
 
 function paymentLine(r: ServiceRequest): string {
   switch (r.status) {
     case "resposta_submetida":
-      return "Pendente";
+      return "Referência por pagar";
     case "pagamento_confirmado":
     case "concluido":
-      return r.paidAt ? `Confirmado, ${formatDateTime(r.paidAt)}` : "Confirmado";
+      return r.paidAt ? `Pago, ${formatDateTime(r.paidAt)}` : "Pago";
     case "cancelado":
       return "Sem pagamento";
     default:
@@ -252,42 +338,66 @@ function paymentLine(r: ServiceRequest): string {
   }
 }
 
-/** The request as a talão: what was asked, where, by when and for how much. */
-function RequestTalao({ request, surfaces }: { request: ServiceRequest; surfaces: Map<string, Surface> }) {
+/** The request as a talão: who, what, where, by when and for how much. */
+function RequestTalao({ request, client, surface }: { request: ServiceRequest; client: Client; surface?: Surface }) {
+  const a = request.amounts;
   return (
-    <aside aria-label="Resumo do pedido">
+    <aside aria-label="Talão do pedido">
       <Receipt title="Talão do pedido" meta={request.id}>
-        {request.items[0].photo && (
-          <ProductPhoto src={request.items[0].photo} alt="Fotografia de referência enviada" ratio="4/3" sizes="352px" />
-        )}
-        <ReceiptRow label="Categoria" value={CATEGORY_LABEL[request.items[0].category]} mono={false} />
-        {request.items[0].brand && <ReceiptRow label="Marca ou modelo" value={request.items[0].brand} mono={false} />}
-        {formatVariations(request.items[0].variations) && <ReceiptRow label="Variantes" value={formatVariations(request.items[0].variations)} mono={false} />}
-        {request.items[0].characteristics && (
-          <div className="flex flex-col gap-0.5">
-            <span className="text-ink-2">Características</span>
-            <span className="text-ink">{request.items[0].characteristics}</span>
-          </div>
-        )}
-        <ReceiptRule />
-        <div className="flex flex-col gap-1">
-          <span className="text-ink-2">Superfícies</span>
-          <ul className="flex flex-col gap-0.5">
-            {[request.surfaceId].map((sid) => (
-              <li key={sid} className="text-ink">
-                {surfaces.get(sid)?.name ?? sid}
-                {surfaces.get(sid) && <span className="text-ink-2"> · {surfaces.get(sid)!.area}</span>}
-              </li>
-            ))}
-          </ul>
+        <div className="flex flex-col gap-1.5">
+          <ReceiptRow
+            label="Cliente"
+            value={<ClientKindBadge kind={client.kind} />}
+            mono={false}
+          />
+          <p className="font-medium text-ink">{clientDisplayName(client)}</p>
+          {client.kind === "empresa" && client.company && (
+            <>
+              <ReceiptRow label="NIF" value={client.company.nif} />
+              <ReceiptRow label="Responsável" value={client.name} mono={false} />
+            </>
+          )}
         </div>
+        <ReceiptRule />
+        <ol className="flex flex-col gap-3">
+          {request.items.map((it, i) => {
+            const variations = formatVariations(it.variations);
+            return (
+              <li key={it.id} className="flex gap-3">
+                <span className="w-5 shrink-0 font-mono text-ink-2 tabular">{i + 1}.</span>
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="font-medium text-ink">{it.name}</span>
+                  <span className="text-xs text-ink-2">
+                    {CATEGORY_LABEL[it.category]}
+                    {it.brand && `, ${it.brand}`}
+                  </span>
+                  {it.characteristics && <span className="text-xs text-ink-2">{it.characteristics}</span>}
+                  {variations && <span className="text-xs text-ink-2">{variations}</span>}
+                </div>
+                {it.photo && (
+                  <ProductPhoto
+                    src={it.photo}
+                    alt={`Fotografia de referência: ${it.name}`}
+                    ratio="1/1"
+                    sizes="48px"
+                    className="w-12 shrink-0"
+                  />
+                )}
+              </li>
+            );
+          })}
+        </ol>
+        <ReceiptRule />
+        <ReceiptRow label="Superfície" value={surface?.name ?? request.surfaceId} mono={false} />
         <ReceiptRow label="Prioridade" value={PRIORITY[request.priority].label} mono={false} />
         {request.deadline && <ReceiptRow label="Resposta até" value={formatDateTime(request.deadline)} />}
         <ReceiptRow label="Submetido" value={formatDateTime(request.createdAt)} />
         {request.respondedAt && <ReceiptRow label="Respondido" value={formatDateTime(request.respondedAt)} />}
         <ReceiptRule />
+        <ReceiptRow label={requestKindLabel(a.itemCount)} value={`${a.itemCount} × ${formatKz(a.unitPrice)}`} />
         <ReceiptRow label="Pagamento" value={paymentLine(request)} mono={false} />
-        <ReceiptTotal label="Valor da consulta" amount={request.amounts.gross} />
+        <ReceiptTotal label="Valor da consulta" amount={a.gross} />
+        <ReceiptNote>Impostos e taxas incluídos ({formatKz(a.taxes)}).</ReceiptNote>
       </Receipt>
     </aside>
   );
@@ -295,14 +405,14 @@ function RequestTalao({ request, surfaces }: { request: ServiceRequest; surfaces
 
 function Results({
   request,
-  surfaces,
+  surface,
   unlocked,
 }: {
   request: ServiceRequest;
-  surfaces: Map<string, Surface>;
+  surface?: Surface;
   unlocked: boolean;
 }) {
-  if (unlocked) return <ResultsBoard request={request} surfaces={surfaces} />;
+  if (unlocked) return <ResultsBoard request={request} surface={surface} />;
   if (request.status === "resposta_submetida") return <LockedResults request={request} />;
   if (request.status === "cancelado")
     return <p className="text-sm text-ink-2">Este pedido foi cancelado antes de haver resultados.</p>;
@@ -310,7 +420,7 @@ function Results({
     <EmptyState
       icon={<HourglassIcon />}
       title="Ainda sem resultados"
-      description="Quando o agente submeter a resposta, vê aqui quantos produtos encontrou em cada superfície e os dados para lhe pagar."
+      description="Quando o agente submeter a resposta, vê aqui quantas ofertas encontrou por item e a referência Multicaixa para pagar."
     />
   );
 }

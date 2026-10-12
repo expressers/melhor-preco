@@ -19,7 +19,7 @@ export function LockedResults({ request }: { request: ServiceRequest }) {
               <div className="mb-4 flex items-baseline justify-between gap-3">
                 <h3 className="text-base">{itemName}</h3>
                 <span className="font-mono text-xs text-ink-2 tabular">
-                  {n} {n === 1 ? "registo" : "registos"}
+                  {n} {n === 1 ? "oferta" : "ofertas"}
                 </span>
               </div>
               <div aria-hidden className={styles.print}>
