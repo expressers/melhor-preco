@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { formatRelative } from "@/lib/format";
 import { CATEGORY_LABEL } from "@/lib/labels";
 import { routes } from "@/lib/routes";
-import { dueAt } from "@/lib/rules";
+import { dueAt, requestTitle } from "@/lib/rules";
 import { useStore } from "@/lib/store";
 import type { Agent, ServiceRequest } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -104,17 +104,17 @@ export function TaskRow({ request, now }: { request: ServiceRequest; now: number
           {request.priority === "urgente" && <span className="text-xs font-semibold text-warning">Urgente</span>}
           {late && <span className="text-xs font-semibold text-error">Atrasado</span>}
         </div>
-        <p className="line-clamp-2 text-[0.9375rem] leading-snug font-medium text-ink">{request.description}</p>
+        <p className="line-clamp-2 text-[0.9375rem] leading-snug font-medium text-ink">{requestTitle(request)}</p>
         <p className="truncate text-[0.8125rem] text-ink-2">
-          {request.surfaceIds.map(surfaceName).join(", ")}
+          {[request.surfaceId].map(surfaceName).join(", ")}
         </p>
         <p className="font-mono text-xs text-ink-2 tabular">
-          {request.id} <span aria-hidden>·</span> {CATEGORY_LABEL[request.category]}{" "}
+          {request.id} <span aria-hidden>·</span> {CATEGORY_LABEL[request.items[0].category]}{" "}
           <span aria-hidden>·</span> {formatRelative(request.updatedAt, now)}
         </p>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-2">
-        <PriceTag amount={request.agentShare} size="sm" label="A sua parte" />
+        <PriceTag amount={request.split.agent} size="sm" label="A sua parte" />
         <CaretRightIcon aria-hidden className="size-4 text-ink-2" />
       </div>
     </Link>

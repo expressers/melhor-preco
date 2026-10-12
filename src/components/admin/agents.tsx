@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { Money } from "@/components/price-tag";
 import { Receipt, ReceiptRow, ReceiptRule } from "@/components/receipt";
-import { AgentStatusBadge, LedgerStatusBadge, StatusBadge } from "@/components/status-badge";
+import { AgentStatusBadge, StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -29,11 +29,12 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate, formatNumber, formatPhone } from "@/lib/format";
-import { AGENT_STATUS, LEDGER_KIND } from "@/lib/labels";
+import { formatIban } from "@/lib/finance";
+import { AGENT_STATUS } from "@/lib/labels";
 import { routes } from "@/lib/routes";
-import { computeIncomplete } from "@/lib/rules";
-import { useStore } from "@/lib/store";
-import type { Agent, AgentStatus, LedgerEntry, ServiceRequest, Surface } from "@/lib/types";
+import { computeIncomplete, requestTitle } from "@/lib/rules";
+import { useStore, useWallet } from "@/lib/store";
+import type { Agent, AgentStatus, ServiceRequest, Surface } from "@/lib/types";
 import { Code, ConfirmDialog, Panel, SearchField, formatDuration, formatPercent, matches, report, useLookups } from "./kit";
 
 type StatusFilter = "todos" | AgentStatus;
@@ -75,7 +76,7 @@ function usePerformance() {
       p.tasks.push(r);
       if (r.results.length > 0) {
         p.answered++;
-        if (computeIncomplete(r.results, r.surfaceIds)) p.incomplete++;
+        if (computeIncomplete(r.results, r.items)) p.incomplete++;
       }
       if (r.status === "pagamento_confirmado" || r.status === "concluido") p.completed++;
       if (r.respondedAt)
@@ -390,13 +391,10 @@ function SurfaceChecklist({
 
 function AgentProfile({ agent: a, perf }: { agent: Agent; perf: Performance }) {
   const surfaces = useStore((s) => s.surfaces);
-  const ledger = useStore((s) => s.ledger);
+  const wallet = useWallet(a.id)!;
   const [surfaceIds, setSurfaceIds] = useState<string[]>(a.surfaceIds);
   const [training, setTraining] = useState("");
-  const entries: LedgerEntry[] = ledger
-    .filter((l) => l.agentId === a.id)
-    .sort((x, y) => y.createdAt.localeCompare(x.createdAt));
-  const sum = (f: (l: LedgerEntry) => boolean) => entries.filter(f).reduce((t, l) => t + l.amount, 0);
+  const entries = wallet.earnings;
   const surfaceChoices = surfaces.filter((s) => s.active || a.surfaceIds.includes(s.id));
   const dirty = [...surfaceIds].sort().join() !== [...a.surfaceIds].sort().join();
 
@@ -482,13 +480,13 @@ function AgentProfile({ agent: a, perf }: { agent: Agent; perf: Performance }) {
             value={Number.isNaN(perf.avgResponse) ? "sem dados" : formatDuration(perf.avgResponse)}
           />
           <ReceiptRule />
-          <ReceiptRow label="A receber dos clientes" value={<Money amount={sum((l) => l.kind === "agent_share" && l.status === "devido")} />} />
-          <ReceiptRow label="Recebido (confirmado)" value={<Money amount={sum((l) => l.kind === "agent_share" && l.status === "confirmado")} />} />
-          <ReceiptRow label="Comissão devida" value={<Money amount={sum((l) => l.kind === "platform_commission" && l.status === "devido")} />} />
-          <ReceiptRow label="Comissão liquidada" value={<Money amount={sum((l) => l.kind === "platform_commission" && l.status === "liquidado")} />} />
+          <ReceiptRow label="Ganhos acumulados" value={<Money amount={wallet.earned} />} />
+          <ReceiptRow label="Levantado" value={<Money amount={wallet.withdrawn} />} />
+          <ReceiptRow label="Levantamentos pendentes" value={<Money amount={wallet.pending} />} />
+          <ReceiptRow label="Saldo disponível" value={<Money amount={wallet.available} />} />
           <ReceiptRule />
-          <ReceiptRow label="Multicaixa Express" value={formatPhone(a.paymentInfo.phone)} />
-          <ReceiptRow label="Titular" value={a.paymentInfo.holder} mono={false} className="pb-4" />
+          <ReceiptRow label="IBAN" value={a.bank ? formatIban(a.bank.iban) : "por registar"} />
+          <ReceiptRow label="Titular" value={a.bank?.holder ?? "por registar"} mono={false} className="pb-4" />
         </Receipt>
       </section>
 
@@ -515,13 +513,11 @@ function AgentProfile({ agent: a, perf }: { agent: Agent; perf: Performance }) {
                         {l.requestId}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-ink-2">{LEDGER_KIND[l.kind]}</TableCell>
+                    <TableCell className="text-ink-2">Ganho (60% do líquido)</TableCell>
                     <TableCell className="text-right">
                       <Money amount={l.amount} />
                     </TableCell>
-                    <TableCell className="pr-4">
-                      <LedgerStatusBadge status={l.status} />
-                    </TableCell>
+                    <TableCell className="pr-4 text-ink-2">{formatDate(l.at)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -545,7 +541,7 @@ function AgentProfile({ agent: a, perf }: { agent: Agent; perf: Performance }) {
                   className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm outline-none transition-colors hover-fine:bg-paper focus-visible:bg-paper"
                 >
                   <Code className="font-medium">{r.id}</Code>
-                  <span className="min-w-0 flex-1 truncate">{r.description}</span>
+                  <span className="min-w-0 flex-1 truncate">{requestTitle(r)}</span>
                   <StatusBadge status={r.status} short />
                 </Link>
               </li>

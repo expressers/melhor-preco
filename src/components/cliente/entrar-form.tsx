@@ -157,7 +157,9 @@ function RegisterForm() {
   });
 
   const onSubmit = (v: RegisterValues) => {
+    // TEMPORARY (domain step): particular only; cliente worker adds the Particular / Empresa choice.
     const res = useStore.getState().registerClient({
+      kind: "particular",
       name: v.name,
       phone: v.phone,
       password: v.password,

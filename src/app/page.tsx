@@ -9,11 +9,12 @@ import { SiteFooter } from "@/components/landing/site-footer";
 import { SiteHeader } from "@/components/landing/site-header";
 import { Surfaces } from "@/components/landing/surfaces";
 import { getPricing, getSurfaces } from "@/lib/data";
+import { quoteFor } from "@/lib/pricing";
 
 export const metadata: Metadata = {
   title: { absolute: "Melhor Preço · Saiba o preço antes de sair de casa" },
   description:
-    "Um agente credenciado vai ao Shopping Popular, à Cidade da China ou ao Novo São Paulo por si e traz preço, stock, variantes e fotografias. Desde 600 Kz por consulta, pagos ao agente depois da resposta.",
+    "Um agente credenciado vai ao Shopping Popular, à Cidade da China ou ao Novo São Paulo por si e traz preço, stock, variantes e fotografias. 1 000 Kz por consulta simples, 800 Kz por item em pedidos múltiplos, pagos por referência Multicaixa depois da resposta.",
   openGraph: {
     title: "Melhor Preço · Saiba o preço antes de sair de casa",
     description:
@@ -32,12 +33,12 @@ export default async function Home() {
     <>
       <SiteHeader />
       <main className="flex flex-col">
-        <Hero minimum={pricing.minimum} />
+        <Hero minimum={pricing.simplePrice} />
         <NotAShop />
         <HowItWorks />
         <Pricing pricing={pricing} />
         <Surfaces active={active} upcoming={upcoming} />
-        <BecomeAgent agentShare={pricing.agentShare} />
+        <BecomeAgent agentShare={quoteFor(1, pricing).split.agent} />
         <Faq />
       </main>
       <SiteFooter />

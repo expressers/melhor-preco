@@ -1,5 +1,6 @@
 "use client";
 
+import { requestTitle } from "@/lib/rules";
 import { UsersIcon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -88,7 +89,7 @@ export function AdminClients() {
             <TableBody>
               {rows.map((c) => {
                 const list = byClient.get(c.id) ?? [];
-                const spent = list.filter((r) => r.paidAt).reduce((t, r) => t + r.price, 0);
+                const spent = list.filter((r) => r.paidAt).reduce((t, r) => t + r.amounts.gross, 0);
                 return (
                   <TableRow key={c.id}>
                     <TableCell className="py-3 pl-4">
@@ -185,7 +186,7 @@ function ClientHistory({ client: c, requests }: { client: Client; requests: Serv
         <ReceiptRow label="Pedidos" value={formatNumber(requests.length)} />
         <ReceiptRow label="Pagos ao agente" value={formatNumber(paid.length)} />
         <ReceiptRow label="Cancelados" value={formatNumber(cancelled)} />
-        <ReceiptRow label="Total em consultas" value={<Money amount={paid.reduce((t, r) => t + r.price, 0)} />} strong className="pb-4" />
+        <ReceiptRow label="Total em consultas" value={<Money amount={paid.reduce((t, r) => t + r.amounts.gross, 0)} />} strong className="pb-4" />
       </Receipt>
 
       <section className="flex flex-col gap-3">
@@ -202,9 +203,9 @@ function ClientHistory({ client: c, requests }: { client: Client; requests: Serv
                 >
                   <span className="flex items-center justify-between gap-3">
                     <Code className="font-medium">{r.id}</Code>
-                    <Money amount={r.price} className="text-ink-2" />
+                    <Money amount={r.amounts.gross} className="text-ink-2" />
                   </span>
-                  <span className="truncate">{r.description}</span>
+                  <span className="truncate">{requestTitle(r)}</span>
                   <span className="flex items-center justify-between gap-3">
                     <StatusBadge status={r.status} short />
                     <span className="font-mono text-xs text-ink-2 tabular">{formatDate(r.createdAt)}</span>

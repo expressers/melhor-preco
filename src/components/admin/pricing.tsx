@@ -1,226 +1,81 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, useWatch, type UseFormRegisterReturn } from "react-hook-form";
-import { z } from "zod";
+// TEMPORARY (domain step): bare v2 pricing form (CHANGES §9). The admin
+// worker rebuilds this screen with live examples and per-field validation.
+
+import { useState } from "react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/app-shell";
-import { Money, PriceTag } from "@/components/price-tag";
-import { Receipt, ReceiptNote, ReceiptRow, ReceiptRule } from "@/components/receipt";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatKz } from "@/lib/format";
-import { DEFAULT_PRICING, PRICE_FLOOR, computePrice, sanitizePricing } from "@/lib/pricing";
+import { TAX_RATE_NOTE, validatePricing } from "@/lib/pricing";
 import { useStore } from "@/lib/store";
-import type { PricingConfig } from "@/lib/types";
-import { report } from "./kit";
+import type { PricingConfig, SplitConfig } from "@/lib/types";
 
-const kz = (msg = "Indique um valor em Kz.") =>
-  z.number({ error: msg }).int("Use valores inteiros em Kz.").min(0, "O valor não pode ser negativo.");
-
-const schema = z
-  .object({
-    minimum: kz().min(PRICE_FLOOR, `O preço mínimo não pode ser inferior a ${formatKz(PRICE_FLOOR)}.`),
-    agentShare: kz(),
-    platformShare: kz(),
-    extraSurfaceIncrement: kz(),
-    extraSurfaceAgentShare: kz(),
-    urgentIncrement: kz(),
-  })
-  .refine((v) => v.agentShare + v.platformShare >= v.minimum, {
-    path: ["platformShare"],
-    message: "Agente e plataforma têm de somar pelo menos o preço mínimo.",
-  })
-  .refine((v) => v.extraSurfaceAgentShare <= v.extraSurfaceIncrement, {
-    path: ["extraSurfaceAgentShare"],
-    message: "A parte do agente não pode ser maior do que o acréscimo.",
-  });
-
-type Values = z.infer<typeof schema>;
+const SPLIT_FIELDS: { key: keyof SplitConfig; label: string }[] = [
+  { key: "agent", label: "Agente (%)" },
+  { key: "platformBelow", label: "Plataforma abaixo dos objectivos (%)" },
+  { key: "operatorBelow", label: "Operador abaixo dos objectivos (%)" },
+  { key: "platformMet", label: "Plataforma com objectivos cumpridos (%)" },
+  { key: "operatorMet", label: "Operador com objectivos cumpridos (%)" },
+];
 
 export function AdminPricing() {
   const pricing = useStore((s) => s.pricing);
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: pricing, mode: "onChange" });
-  const { errors, isDirty } = form.formState;
-  const draft = useWatch({ control: form.control }) as Partial<PricingConfig>;
+  const [draft, setDraft] = useState<PricingConfig>(pricing);
+  const errors = validatePricing(draft);
+  const num = (v: string) => (v === "" ? NaN : Number(v));
 
-  // Preview never shows a price below the floor, even while the form is invalid.
-  const preview = sanitizePricing({ ...pricing, ...numeric(draft) });
-  const base = computePrice(preview, 1);
-  const invalid = Object.keys(errors).length > 0;
-
-  const submit = form.handleSubmit((v) => {
-    const res = useStore.getState().updatePricing(v);
-    if (report(res, "Configuração de preços guardada. Aplica-se aos novos pedidos.") && res.ok) form.reset(res.pricing);
-  });
-
-  const f = (name: keyof Values) => form.register(name, { valueAsNumber: true });
+  function save() {
+    const res = useStore.getState().updatePricing(draft);
+    if (!res.ok) return toast.error(res.error);
+    toast.success("Preços actualizados");
+  }
 
   return (
     <>
-      <PageHeader
-        title="Configuração de preços"
-        description={`O preço de uma consulta nunca fica abaixo de ${formatKz(PRICE_FLOOR)}. As alterações valem para pedidos novos; os pedidos já feitos mantêm o preço com que foram confirmados.`}
-      />
-
-      <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_26rem]">
-        <form onSubmit={submit} noValidate className="flex min-w-0 flex-col gap-8">
-          <Group title="Consulta base" hint="Uma superfície, prioridade normal.">
-            <MoneyField id="minimum" label="Preço mínimo" field={f("minimum")} error={errors.minimum?.message} />
-            <MoneyField id="agentShare" label="Parte do agente" field={f("agentShare")} error={errors.agentShare?.message} />
-            <MoneyField
-              id="platformShare"
-              label="Comissão da plataforma"
-              field={f("platformShare")}
-              error={errors.platformShare?.message}
+      <PageHeader title="Preços" description={TAX_RATE_NOTE} />
+      <div className="grid max-w-xl gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="p-simple">Consulta simples (Kz, bruto)</Label>
+          <Input id="p-simple" inputMode="numeric" value={draft.simplePrice} onChange={(e) => setDraft({ ...draft, simplePrice: num(e.target.value) })} />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="p-multi">Preço por item no pedido múltiplo (Kz, bruto)</Label>
+          <Input id="p-multi" inputMode="numeric" value={draft.multiItemPrice} onChange={(e) => setDraft({ ...draft, multiItemPrice: num(e.target.value) })} />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="p-tax">Impostos e taxas (%)</Label>
+          <Input
+            id="p-tax"
+            inputMode="decimal"
+            value={Math.round(draft.taxRate * 1000) / 10}
+            onChange={(e) => setDraft({ ...draft, taxRate: num(e.target.value) / 100 })}
+          />
+        </div>
+        {SPLIT_FIELDS.map((f) => (
+          <div key={f.key} className="grid gap-2">
+            <Label htmlFor={`p-${f.key}`}>{f.label}</Label>
+            <Input
+              id={`p-${f.key}`}
+              inputMode="numeric"
+              value={draft.split[f.key]}
+              onChange={(e) => setDraft({ ...draft, split: { ...draft.split, [f.key]: num(e.target.value) } })}
             />
-          </Group>
-
-          <Group title="Superfícies extra" hint="Por cada superfície além da primeira.">
-            <MoneyField
-              id="extraSurfaceIncrement"
-              label="Acréscimo por superfície"
-              field={f("extraSurfaceIncrement")}
-              error={errors.extraSurfaceIncrement?.message}
-            />
-            <MoneyField
-              id="extraSurfaceAgentShare"
-              label="Desse acréscimo, para o agente"
-              field={f("extraSurfaceAgentShare")}
-              error={errors.extraSurfaceAgentShare?.message}
-            />
-          </Group>
-
-          <Group title="Urgência" hint="Somado quando o cliente pede resposta no próprio dia. Vai todo para o agente.">
-            <MoneyField id="urgentIncrement" label="Acréscimo urgente" field={f("urgentIncrement")} error={errors.urgentIncrement?.message} />
-          </Group>
-
-          <div className="flex flex-wrap items-center gap-2 border-t border-line pt-6">
-            <Button type="submit" variant="tag" disabled={!isDirty || invalid}>
-              Guardar preços
-            </Button>
-            <Button type="button" variant="outline" disabled={!isDirty} onClick={() => form.reset(pricing)}>
-              Descartar alterações
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => form.reset(DEFAULT_PRICING, { keepDefaultValues: true })}
-            >
-              Repor 600 / 400 / 200
-            </Button>
           </div>
-        </form>
-
-        <aside className="flex min-w-0 flex-col gap-3">
-          <h2 className="text-base font-semibold">Pré-visualização</h2>
-          <Receipt title="O que o cliente vê" meta={isDirty ? "por guardar" : "em vigor"}>
-            <div className="flex items-center justify-between gap-3 py-1">
-              <span className="text-ink-2">Consulta numa superfície</span>
-              <PriceTag amount={base.price} size="lg" label="Preço base" />
-            </div>
-            <ReceiptRow label="Para o agente" value={<Money amount={base.agentShare} />} />
-            <ReceiptRow label="Comissão da plataforma" value={<Money amount={base.platformShare} />} />
-            <ReceiptRule />
-            <div className="-mx-1">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="px-1">Superfícies</TableHead>
-                    <TableHead className="px-1 text-right">Normal</TableHead>
-                    <TableHead className="px-1 text-right">Urgente</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[1, 2, 3, 4].map((n) => {
-                    const normal = computePrice(preview, n);
-                    const urgent = computePrice(preview, n, "urgente");
-                    return (
-                      <TableRow key={n} className="hover:bg-transparent">
-                        <TableCell className="px-1 font-mono tabular">{n}</TableCell>
-                        <TableCell className="px-1 text-right">
-                          <Money amount={normal.price} />
-                          <span className="block font-mono text-xs text-ink-2 tabular">
-                            {normal.agentShare} + {normal.platformShare}
-                          </span>
-                        </TableCell>
-                        <TableCell className="px-1 text-right">
-                          <Money amount={urgent.price} />
-                          <span className="block font-mono text-xs text-ink-2 tabular">
-                            {urgent.agentShare} + {urgent.platformShare}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-            <ReceiptNote className="pb-4">
-              Abaixo de cada preço: parte do agente + comissão da plataforma, em Kz.
-              {invalid && " Há valores por corrigir; a pré-visualização usa o mínimo permitido."}
-            </ReceiptNote>
-          </Receipt>
-        </aside>
+        ))}
+        {errors.length > 0 && (
+          <ul className="list-disc pl-5 text-sm text-error">
+            {errors.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+        )}
+        <Button variant="tag" onClick={save} disabled={errors.length > 0} className="justify-self-start">
+          Guardar preços
+        </Button>
       </div>
     </>
-  );
-}
-
-function numeric(v: Partial<PricingConfig>): Partial<PricingConfig> {
-  return Object.fromEntries(
-    Object.entries(v).filter(([, x]) => typeof x === "number" && Number.isFinite(x)),
-  ) as Partial<PricingConfig>;
-}
-
-function Group({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
-  return (
-    <fieldset className="flex flex-col gap-4">
-      <legend className="mb-3">
-        <span className="block text-base font-semibold">{title}</span>
-        <span className="block text-sm text-ink-2">{hint}</span>
-      </legend>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{children}</div>
-    </fieldset>
-  );
-}
-
-function MoneyField({
-  id,
-  label,
-  field,
-  error,
-}: {
-  id: string;
-  label: string;
-  field: UseFormRegisterReturn;
-  error?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={id}>{label}</Label>
-      <div className="relative">
-        <Input
-          id={id}
-          type="number"
-          inputMode="numeric"
-          min={0}
-          step={50}
-          aria-invalid={!!error}
-          aria-describedby={error ? `${id}-error` : undefined}
-          className="h-11 pr-12 font-mono tabular"
-          {...field}
-        />
-        <span aria-hidden className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 font-mono text-sm text-ink-2">
-          Kz
-        </span>
-      </div>
-      {error && (
-        <p id={`${id}-error`} className="text-sm text-error">
-          {error}
-        </p>
-      )}
-    </div>
   );
 }

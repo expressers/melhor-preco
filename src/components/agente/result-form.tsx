@@ -1,5 +1,6 @@
 "use client";
 
+import { requestTitle } from "@/lib/rules";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ClockIcon, MagnifyingGlassMinusIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { Controller, useFieldArray, useForm, useWatch, type Control } from "react-hook-form";
@@ -18,7 +19,7 @@ import type { Availability, ServiceRequest } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import styles from "./agente.module.scss";
 import { PhotoInput } from "./photo-input";
-import { ChoiceTile, useSurfaceNames } from "./shared";
+import { ChoiceTile } from "./shared";
 import { useNow } from "./use-now";
 
 export const RESULT_FORM_ID = "resposta-agente";
@@ -27,7 +28,7 @@ const AVAILABILITY_KEYS = Object.keys(AVAILABILITY) as Availability[];
 
 const itemSchema = z
   .object({
-    surfaceId: z.string().min(1, "Escolha a superfície."),
+    itemId: z.string().min(1, "Escolha o item."),
     notFound: z.boolean(),
     productName: z.string().trim(),
     brandModel: z.string().trim(),
@@ -53,11 +54,11 @@ const schema = z.object({ items: z.array(itemSchema).min(1, "Adicione pelo menos
 type FormValues = z.infer<typeof schema>;
 type Item = FormValues["items"][number];
 
-function blankItem(request: ServiceRequest, surfaceId?: string, notFound = false): Item {
+function blankItem(request: ServiceRequest, itemId?: string, notFound = false): Item {
   return {
-    surfaceId: surfaceId ?? request.surfaceIds[0] ?? "",
+    itemId: itemId ?? request.items.map((i) => i.id)[0] ?? "",
     notFound,
-    productName: notFound ? request.description : "",
+    productName: notFound ? requestTitle(request) : "",
     brandModel: "",
     price: "",
     store: "",
@@ -73,7 +74,7 @@ const onlyDigits = (s: string) => s.replace(/\D/g, "").replace(/^0+(?=\d)/, "").
 
 /** em_consulta: one card per product found (or not found), per surface. */
 export function ResultForm({ request, onSubmitted }: { request: ServiceRequest; onSubmitted: () => void }) {
-  const surfaceName = useSurfaceNames();
+  const surfaceName = (id: string) => request.items.find((i) => i.id === id)?.name ?? id;
   const now = useNow(15_000);
 
   const form = useForm<FormValues>({
@@ -84,7 +85,7 @@ export function ResultForm({ request, onSubmitted }: { request: ServiceRequest; 
   });
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
   const items = useWatch({ control: form.control, name: "items" });
-  const multiSurface = request.surfaceIds.length > 1;
+  const multiSurface = request.items.map((i) => i.id).length > 1;
 
   // A second tap is harmless: after the first submit the request leaves
   // em_consulta and the store refuses another answer.
@@ -92,14 +93,14 @@ export function ResultForm({ request, onSubmitted }: { request: ServiceRequest; 
     const payload: ResultInput[] = values.items.map((it) =>
       it.notFound
         ? {
-            surfaceId: it.surfaceId,
+            itemId: it.itemId,
             notFound: true,
-            productName: it.productName || request.description,
+            productName: it.productName || requestTitle(request),
             observations: it.observations || undefined,
             photos: it.photos,
           }
         : {
-            surfaceId: it.surfaceId,
+            itemId: it.itemId,
             notFound: false,
             productName: it.productName,
             brandModel: it.brandModel || undefined,
@@ -129,7 +130,7 @@ export function ResultForm({ request, onSubmitted }: { request: ServiceRequest; 
     first?.focus();
   }
 
-  const missingSurfaces = request.surfaceIds.filter((s) => !items?.some((it) => it.surfaceId === s));
+  const missingSurfaces = request.items.map((i) => i.id).filter((s) => !items?.some((it) => it.itemId === s));
 
   return (
     <form
@@ -155,8 +156,8 @@ export function ResultForm({ request, onSubmitted }: { request: ServiceRequest; 
       {/* Coverage: each requested surface needs at least one entry. */}
       {multiSurface && (
         <ul className="flex flex-col gap-1.5 rounded-lg bg-paper-2 p-3 text-sm" aria-label="Cobertura por superfície">
-          {request.surfaceIds.map((s) => {
-            const entries = items?.filter((it) => it.surfaceId === s) ?? [];
+          {request.items.map((i) => i.id).map((s) => {
+            const entries = items?.filter((it) => it.itemId === s) ?? [];
             const found = entries.filter((it) => !it.notFound).length;
             const nf = entries.length - found;
             return (
@@ -196,7 +197,7 @@ export function ResultForm({ request, onSubmitted }: { request: ServiceRequest; 
           variant="outline"
           size="lg"
           className="w-full"
-          onClick={() => append(blankItem(request, missingSurfaces[0] ?? items?.at(-1)?.surfaceId))}
+          onClick={() => append(blankItem(request, missingSurfaces[0] ?? items?.at(-1)?.itemId))}
         >
           <PlusIcon weight="bold" />
           Adicionar outro produto
@@ -264,17 +265,17 @@ function ItemCard({
         )}
       </div>
 
-      {request.surfaceIds.length > 1 && (
+      {request.items.map((i) => i.id).length > 1 && (
         <Controller
           control={control}
-          name={`items.${index}.surfaceId`}
+          name={`items.${index}.itemId`}
           render={({ field }) => (
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium text-ink" id={`${p}-sf`}>
                 Superfície
               </span>
               <div role="radiogroup" aria-labelledby={`${p}-sf`} className="grid gap-2 sm:grid-cols-2">
-                {request.surfaceIds.map((s) => (
+                {request.items.map((i) => i.id).map((s) => (
                   <ChoiceTile key={s} role="radio" checked={field.value === s} onToggle={() => field.onChange(s)}>
                     {surfaceName(s)}
                   </ChoiceTile>
@@ -284,9 +285,9 @@ function ItemCard({
           )}
         />
       )}
-      {request.surfaceIds.length === 1 && (
+      {request.items.map((i) => i.id).length === 1 && (
         <p className="text-sm text-ink-2">
-          Superfície: <span className="font-medium text-ink">{surfaceName(request.surfaceIds[0])}</span>
+          Item: <span className="font-medium text-ink">{surfaceName(request.items.map((i) => i.id)[0])}</span>
         </p>
       )}
 
@@ -364,7 +365,7 @@ function ItemCard({
             name={`items.${index}.productName`}
             id={`${p}-name`}
             label="Produto"
-            placeholder={request.description}
+            placeholder={requestTitle(request)}
           />
           <TextField
             control={control}

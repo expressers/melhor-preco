@@ -7,6 +7,7 @@ import { Money, PriceTag } from "@/components/price-tag";
 import { StatusBadge } from "@/components/status-badge";
 import { formatDateTime } from "@/lib/format";
 import { routes } from "@/lib/routes";
+import { requestTitle } from "@/lib/rules";
 import { useStore } from "@/lib/store";
 import type { ServiceRequest, Surface } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -41,15 +42,15 @@ export function RequestRow({ request, className }: { request: ServiceRequest; cl
             {formatDateTime(request.createdAt)}
           </time>
         </div>
-        <p className="line-clamp-2 text-[0.9375rem] leading-snug font-medium text-ink">{request.description}</p>
-        <p className="truncate text-[0.8125rem] text-ink-2">{surfaceNames(request.surfaceIds, map)}</p>
+        <p className="line-clamp-2 text-[0.9375rem] leading-snug font-medium text-ink">{requestTitle(request)}</p>
+        <p className="truncate text-[0.8125rem] text-ink-2">{surfaceNames([request.surfaceId], map)}</p>
       </div>
 
       <div className="flex flex-col items-end gap-2 self-start">
         {toPay ? (
-          <PriceTag amount={request.price} size="sm" label="A pagar" />
+          <PriceTag amount={request.amounts.gross} size="sm" label="A pagar" />
         ) : (
-          <Money amount={request.price} className="text-sm text-ink" />
+          <Money amount={request.amounts.gross} className="text-sm text-ink" />
         )}
         <CaretRightIcon
           aria-hidden

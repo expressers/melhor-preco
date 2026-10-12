@@ -5,7 +5,7 @@ import { ArrowLeftIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { HydrationGate } from "@/components/hydration-gate";
@@ -14,7 +14,7 @@ import { AgentStatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { isValidIban } from "@/lib/finance";
 import { formatPhone } from "@/lib/format";
 import { routes } from "@/lib/routes";
 import { useStore } from "@/lib/store";
@@ -32,13 +32,12 @@ const schema = z
     email: z.union([z.literal(""), z.email("Este e-mail não parece válido.")]),
     photo: z.array(z.string()).max(1),
     surfaceIds: z.array(z.string()).min(1, "Escolha pelo menos uma superfície."),
-    samePhone: z.boolean(),
-    mcxPhone: z.string().trim(),
-    mcxHolder: z.string().trim(),
+    iban: z.string().trim(),
+    holder: z.string().trim(),
   })
   .superRefine((v, ctx) => {
-    if (!v.samePhone && !nineDigits(v.mcxPhone))
-      ctx.addIssue({ code: "custom", path: ["mcxPhone"], message: "O número deve ter 9 dígitos." });
+    if (v.iban && !isValidIban(v.iban))
+      ctx.addIssue({ code: "custom", path: ["iban"], message: "IBAN inválido: AO06 seguido de 21 dígitos." });
   });
 
 type Values = z.infer<typeof schema>;
@@ -90,13 +89,11 @@ function ApplicationForm({ onDone }: { onDone: (a: Agent) => void }) {
       email: "",
       photo: [],
       surfaceIds: [],
-      samePhone: true,
-      mcxPhone: "",
-      mcxHolder: "",
+      iban: "",
+      holder: "",
     },
   });
   const { errors, isSubmitting } = form.formState;
-  const samePhone = useWatch({ control: form.control, name: "samePhone" });
 
   function submit(v: Values) {
     const phone = formatPhone(v.phone);
@@ -106,11 +103,7 @@ function ApplicationForm({ onDone }: { onDone: (a: Agent) => void }) {
       email: v.email || undefined,
       photo: v.photo[0],
       surfaceIds: v.surfaceIds,
-      paymentInfo: {
-        method: "multicaixa-express",
-        phone: v.samePhone ? phone : formatPhone(v.mcxPhone),
-        holder: v.mcxHolder || v.name,
-      },
+      bank: v.iban ? { iban: v.iban, holder: v.holder || v.name } : undefined,
     });
     if (!res.ok) {
       toast.error(res.error);
@@ -216,35 +209,19 @@ function ApplicationForm({ onDone }: { onDone: (a: Agent) => void }) {
         <fieldset className="flex flex-col gap-4">
           <legend className="mb-1 text-base font-semibold text-ink">Como quer receber</legend>
           <p className="-mt-2 text-sm text-ink-2">
-            Os clientes pagam-lhe directamente por Multicaixa Express depois de receberem a resposta.
+            Os seus ganhos ficam na carteira e pode pedir o levantamento por transferência para o seu IBAN.
           </p>
-          <Controller
-            control={form.control}
-            name="samePhone"
-            render={({ field }) => (
-              <label
-                htmlFor="c-same"
-                className="flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-lg bg-surface px-3.5 ring-1 ring-line"
-              >
-                <span className="text-[0.9375rem] font-medium text-ink">Usar o mesmo número de telefone</span>
-                <Switch id="c-same" checked={field.value} onCheckedChange={field.onChange} />
-              </label>
-            )}
-          />
-          {!samePhone && (
-            <Field id="c-mcx" label="Número Multicaixa Express" error={errors.mcxPhone?.message}>
-              <Input
-                id="c-mcx"
-                type="tel"
-                inputMode="tel"
-                className="h-12 font-mono tabular"
-                aria-invalid={!!errors.mcxPhone}
-                {...form.register("mcxPhone")}
-              />
-            </Field>
-          )}
+          <Field id="c-iban" label="IBAN (opcional)" hint="Pode registar mais tarde no perfil. Ex.: AO06 0040 0000 …" error={errors.iban?.message}>
+            <Input
+              id="c-iban"
+              autoCapitalize="characters"
+              className="h-12 font-mono tabular"
+              aria-invalid={!!errors.iban}
+              {...form.register("iban")}
+            />
+          </Field>
           <Field id="c-holder" label="Titular da conta (opcional)" hint="Se ficar vazio, usamos o seu nome.">
-            <Input id="c-holder" autoComplete="name" className="h-12" {...form.register("mcxHolder")} />
+            <Input id="c-holder" autoComplete="name" className="h-12" {...form.register("holder")} />
           </Field>
         </fieldset>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftIcon, CheckIcon, FileXIcon, MapPinIcon, PaperPlaneTiltIcon, WalletIcon } from "@phosphor-icons/react";
+import { ArrowLeftIcon, CheckIcon, FileXIcon, MapPinIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -14,11 +14,10 @@ import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/format";
 import { CATEGORY_LABEL, PRIORITY } from "@/lib/labels";
 import { routes } from "@/lib/routes";
-import { dueAt } from "@/lib/rules";
+import { dueAt, requestTitle, formatVariations } from "@/lib/rules";
 import { useCurrentAgent, useRequest, useStore } from "@/lib/store";
 import type { Agent, ServiceRequest } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { AwaitingPayment, ConfirmPaymentDialog, PaymentDone } from "./payment";
 import { RejectSheet } from "./reject-sheet";
 import { RESULT_FORM_ID, ResultForm } from "./result-form";
 import { ActionBar, NoAgent, useSurfaceNames } from "./shared";
@@ -90,15 +89,18 @@ function TaskBody({
   const surfaces = useStore((s) => s.surfaces);
   const now = useNow();
   const [rejectOpen, setRejectOpen] = useState(false);
-  const [payOpen, setPayOpen] = useState(false);
 
   const due = dueAt(request);
   const status = request.status;
   const late = ["agente_atribuido", "em_consulta"].includes(status) && now > due;
 
   function accept() {
-    const res = useStore.getState().acceptRequest(request.id);
+    // TEMPORARY (domain step): accept + start in one tap; the agente worker may split them.
+    const st = useStore.getState();
+    const res = request.acceptedAt ? { ok: true as const } : st.acceptRequest(request.id);
     if (!res.ok) return toast.error(res.error);
+    const started = st.startConsultation(request.id);
+    if (!started.ok) return toast.error(started.error);
     toast.success("Pedido aceite", { description: "Boa consulta. Submeta a resposta quando tiver os preços." });
     window.scrollTo({ top: 0 });
   }
@@ -117,9 +119,9 @@ function TaskBody({
             <span className="rounded-full bg-warning/10 px-2.5 py-0.5 text-xs font-semibold text-warning">Urgente</span>
           )}
         </div>
-        <h1 className="text-2xl leading-tight sm:text-[1.75rem]">{request.description}</h1>
+        <h1 className="text-2xl leading-tight sm:text-[1.75rem]">{requestTitle(request)}</h1>
         <p className="font-mono text-sm text-ink-2 tabular">
-          {request.id} <span aria-hidden>·</span> <span className="font-sans">{CATEGORY_LABEL[request.category]}</span>
+          {request.id} <span aria-hidden>·</span> <span className="font-sans">{CATEGORY_LABEL[request.items[0].category]}</span>
         </p>
       </header>
 
@@ -132,7 +134,7 @@ function TaskBody({
       <div className="mt-6 flex items-end justify-between gap-4 border-y border-line py-4">
         <div className="flex flex-col gap-1">
           <span className="text-sm text-ink-2">Fica para si</span>
-          <PriceTag amount={request.agentShare} size="lg" label="A sua parte" />
+          <PriceTag amount={request.split.agent} size="lg" label="A sua parte" />
         </div>
         <div className="flex flex-col items-end gap-0.5 text-right">
           <span className="text-sm text-ink-2">{PRIORITY[request.priority].label}, até</span>
@@ -152,7 +154,7 @@ function TaskBody({
           <div className="flex flex-col gap-2">
             <h3 className="text-sm font-medium text-ink-2">Onde procurar</h3>
             <ul className="flex flex-col gap-2">
-              {request.surfaceIds.map((sid) => {
+              {[request.surfaceId].map((sid) => {
                 const s = surfaces.find((x) => x.id === sid);
                 return (
                   <li key={sid} className="flex items-start gap-3 rounded-lg bg-surface p-3.5 ring-1 ring-line">
@@ -173,18 +175,18 @@ function TaskBody({
           </div>
 
           <dl className="grid gap-4 sm:grid-cols-2">
-            {request.brand && <Spec term="Marca ou modelo" value={request.brand} />}
-            {request.features && <Spec term="Características pretendidas" value={request.features} />}
-            {request.variants && <Spec term="Cores, tamanhos, variantes" value={request.variants} />}
+            {request.items[0].brand && <Spec term="Marca ou modelo" value={request.items[0].brand} />}
+            {request.items[0].characteristics && <Spec term="Características pretendidas" value={request.items[0].characteristics} />}
+            {formatVariations(request.items[0].variations) && <Spec term="Cores, tamanhos, variantes" value={formatVariations(request.items[0].variations) ?? ""} />}
             <Spec term="Pedido feito em" value={formatDateTime(request.createdAt)} mono />
           </dl>
 
-          {request.photo && (
+          {request.items[0].photo && (
             <div className="flex flex-col gap-2">
               <h3 className="text-sm font-medium text-ink-2">Foto de referência do cliente</h3>
               <ProductPhoto
-                src={request.photo}
-                alt={`Referência: ${request.description}`}
+                src={request.items[0].photo}
+                alt={`Referência: ${requestTitle(request)}`}
                 ratio="4/3"
                 className="max-w-sm"
               />
@@ -197,7 +199,7 @@ function TaskBody({
         <div className="mt-8">
           {status === "agente_atribuido" && (
             <p className="rounded-lg bg-paper-2 px-4 py-3 text-[0.9375rem] text-ink">
-              Leia o pedido e aceite se consegue ir {request.surfaceIds.length > 1 ? "às superfícies" : "à superfície"}{" "}
+              Leia o pedido e aceite se consegue ir {[request.surfaceId].length > 1 ? "às superfícies" : "à superfície"}{" "}
               dentro do prazo. Se não conseguir, rejeite para que outro agente o faça.
             </p>
           )}
@@ -214,8 +216,18 @@ function TaskBody({
               </Button>
             </div>
           )}
-          {status === "resposta_submetida" && <AwaitingPayment request={request} agent={agent} />}
-          {(status === "pagamento_confirmado" || status === "concluido") && <PaymentDone request={request} />}
+          {/* TEMPORARY (domain step): the client pays the platform by Multicaixa reference; agente worker owns this copy. */}
+          {status === "resposta_submetida" && (
+            <p className="rounded-lg bg-paper-2 px-4 py-3 text-[0.9375rem] text-ink">
+              Resposta enviada. O cliente paga à plataforma pela referência Multicaixa; a sua parte entra na carteira
+              quando o pagamento for confirmado.
+            </p>
+          )}
+          {(status === "pagamento_confirmado" || status === "concluido") && (
+            <p className="rounded-lg bg-success/10 px-4 py-3 text-[0.9375rem] text-ink">
+              Pagamento confirmado pela plataforma. {agent.code}: carteira creditada.
+            </p>
+          )}
           {status === "cancelado" && (
             <p className="rounded-lg bg-error/10 px-4 py-3 text-[0.9375rem] text-error">
               Pedido cancelado{request.cancelReason ? `: ${request.cancelReason}` : "."}
@@ -251,14 +263,6 @@ function TaskBody({
           </Button>
         </ActionBar>
       )}
-      {!rejectedByMe && status === "resposta_submetida" && (
-        <ActionBar note="Só quando o valor já estiver na sua conta.">
-          <Button variant="tag" onClick={() => setPayOpen(true)}>
-            <WalletIcon weight="bold" />
-            Confirmar recepção do pagamento
-          </Button>
-        </ActionBar>
-      )}
 
       {!rejectedByMe && (
         <RejectSheet
@@ -267,9 +271,6 @@ function TaskBody({
           onOpenChange={setRejectOpen}
           onDone={() => router.push(routes.agente.home)}
         />
-      )}
-      {status === "resposta_submetida" && (
-        <ConfirmPaymentDialog request={request} open={payOpen} onOpenChange={setPayOpen} />
       )}
     </>
   );

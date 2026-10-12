@@ -49,7 +49,7 @@ export function TasksView() {
 
   const byStatus = (s: RequestStatus) => requests.filter((r) => r.status === s);
   const open = GROUPS.flatMap((g) => byStatus(g.status));
-  const pendingMoney = byStatus("resposta_submetida").reduce((t, r) => t + r.agentShare, 0);
+  const pendingMoney = byStatus("resposta_submetida").reduce((t, r) => t + r.split.agent, 0);
 
   return (
     <>

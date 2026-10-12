@@ -39,7 +39,7 @@ export function AdminSurfaces() {
   const usage = useMemo(() => {
     const m = new Map<string, { total: number; open: number }>();
     for (const r of requests)
-      for (const sid of r.surfaceIds) {
+      for (const sid of [r.surfaceId]) {
         const u = m.get(sid) ?? { total: 0, open: 0 };
         u.total++;
         if (OPEN_STATUSES.includes(r.status)) u.open++;

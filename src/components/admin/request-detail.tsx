@@ -20,7 +20,7 @@ import { Receipt, ReceiptRow, ReceiptRule } from "@/components/receipt";
 import {
   AvailabilityBadge,
   ComplaintStatusBadge,
-  LedgerStatusBadge,
+  ReferenceStatusBadge,
   StatusBadge,
   ToneBadge,
 } from "@/components/status-badge";
@@ -45,10 +45,11 @@ import {
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { formatReference, referenceDisplayStatus } from "@/lib/finance";
 import { formatDateTime, formatPhone } from "@/lib/format";
 import { CATEGORY_LABEL, PRIORITY, REQUEST_STATUS } from "@/lib/labels";
 import { routes } from "@/lib/routes";
-import { dueAt } from "@/lib/rules";
+import { dueAt, requestTitle, formatVariations } from "@/lib/rules";
 import { useEligibleAgents, useRequest, useStore } from "@/lib/store";
 import type { RequestStatus, ServiceRequest } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -89,13 +90,10 @@ export function AdminRequestDetail() {
 function Detail({ request: r }: { request: ServiceRequest }) {
   const { client, agent, surface } = useLookups();
   const complaints = useStore((s) => s.complaints);
-  const ledger = useStore((s) => s.ledger);
   const now = useNow();
   const c = client.get(r.clientId);
   const a = r.agentId ? agent.get(r.agentId) : undefined;
   const reqComplaints = complaints.filter((x) => x.requestId === r.id);
-  const agentEntry = ledger.find((l) => l.requestId === r.id && l.kind === "agent_share");
-  const commission = ledger.find((l) => l.requestId === r.id && l.kind === "platform_commission");
 
   return (
     <>
@@ -113,7 +111,7 @@ function Detail({ request: r }: { request: ServiceRequest }) {
             <FlagBadges request={r} now={now} />
           </span>
         }
-        description={r.description}
+        description={requestTitle(r)}
         actions={
           ADMIN_CANCELLABLE.includes(r.status) ? (
             <ConfirmDialog
@@ -150,13 +148,13 @@ function Detail({ request: r }: { request: ServiceRequest }) {
                   "-"
                 )}
               </Field>
-              <Field label="Categoria">{CATEGORY_LABEL[r.category]}</Field>
-              {r.brand && <Field label="Marca ou modelo">{r.brand}</Field>}
-              {r.features && <Field label="Características">{r.features}</Field>}
-              {r.variants && <Field label="Tamanho, cor, variantes">{r.variants}</Field>}
+              <Field label="Categoria">{CATEGORY_LABEL[r.items[0].category]}</Field>
+              {r.items[0].brand && <Field label="Marca ou modelo">{r.items[0].brand}</Field>}
+              {r.items[0].characteristics && <Field label="Características">{r.items[0].characteristics}</Field>}
+              {formatVariations(r.items[0].variations) && <Field label="Tamanho, cor, variantes">{formatVariations(r.items[0].variations)}</Field>}
               <Field label="Superfícies">
                 <ul>
-                  {r.surfaceIds.map((sid) => {
+                  {[r.surfaceId].map((sid) => {
                     const s = surface.get(sid);
                     return (
                       <li key={sid}>
@@ -178,9 +176,9 @@ function Detail({ request: r }: { request: ServiceRequest }) {
                 {formatDateTime(new Date(dueAt(r)).toISOString())}
               </Field>
               {r.cancelReason && <Field label="Motivo do cancelamento">{r.cancelReason}</Field>}
-              {r.photo && (
+              {r.items[0].photo && (
                 <Field label="Foto de referência">
-                  <ProductPhoto src={r.photo} alt={`Referência: ${r.description}`} className="mt-1 w-40" sizes="160px" />
+                  <ProductPhoto src={r.items[0].photo} alt={`Referência: ${requestTitle(r)}`} className="mt-1 w-40" sizes="160px" />
                 </Field>
               )}
             </dl>
@@ -218,55 +216,50 @@ function Detail({ request: r }: { request: ServiceRequest }) {
             <Receipt title="Talão do pedido" meta={r.id}>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-ink-2">Valor da consulta</span>
-                <PriceTag amount={r.price} label="Valor da consulta" />
+                <PriceTag amount={r.amounts.gross} label="Valor da consulta" />
               </div>
-              <ReceiptRow label="Parte do agente" value={<Money amount={r.agentShare} />} />
-              <ReceiptRow label="Comissão da plataforma" value={<Money amount={r.platformShare} />} />
+              {/* TEMPORARY (domain step): v2 finance rows; the admin worker owns the final layout. */}
+              <ReceiptRow label="Impostos e taxas" value={<Money amount={r.amounts.taxes} />} />
+              <ReceiptRow label="Líquido" value={<Money amount={r.amounts.net} />} />
               <ReceiptRule />
+              <ReceiptRow label="Agente (60%)" value={<Money amount={r.split.agent} />} />
+              <ReceiptRow label="Plataforma" value={<Money amount={r.split.platform} />} />
               <ReceiptRow
-                label="Pagamento ao agente"
-                mono={false}
-                value={agentEntry ? <LedgerStatusBadge status={agentEntry.status} /> : <span className="text-ink-2">Aguarda resposta</span>}
+                label={`Operador (${r.split.operatorPct}%, ${r.split.final ? "final" : "provisório"})`}
+                value={<Money amount={r.split.operator} />}
               />
-              <ReceiptRow
-                label="Comissão"
-                mono={false}
-                value={
-                  commission ? (
-                    <LedgerStatusBadge status={commission.status} />
-                  ) : (
-                    <span className="text-ink-2">Após confirmação</span>
-                  )
-                }
-              />
-              {r.paidAt && <ReceiptRow label="Pago em" value={formatDateTime(r.paidAt)} />}
-              {a && (
+              {r.reference && (
                 <>
                   <ReceiptRule />
-                  <ReceiptRow label="Multicaixa Express" value={formatPhone(a.paymentInfo.phone)} />
-                  <ReceiptRow label="Titular" value={a.paymentInfo.holder} mono={false} />
+                  <ReceiptRow label="Entidade" value={r.reference.entity} />
+                  <ReceiptRow label="Referência" value={formatReference(r.reference.reference)} />
+                  <ReceiptRow
+                    label="Estado da referência"
+                    mono={false}
+                    value={<ReferenceStatusBadge status={referenceDisplayStatus(r.reference, now)} />}
+                  />
                 </>
               )}
+              {r.paidAt && <ReceiptRow label="Pago em" value={formatDateTime(r.paidAt)} />}
               <div className="pb-4">
-                {commission?.status === "devido" ? (
+                {r.status === "resposta_submetida" && r.reference?.status === "pendente" ? (
                   <ConfirmDialog
-                    trigger={<Button className="w-full">Registar liquidação da comissão</Button>}
-                    title="Registar liquidação?"
+                    trigger={<Button className="w-full">Confirmar pagamento da referência</Button>}
+                    title="Confirmar pagamento?"
                     description={
                       <>
-                        Confirme que o agente {a?.code ?? ""} entregou <Money amount={commission.amount} /> de comissão à
-                        plataforma. O registo fica no histórico do pedido.
+                        Confirme que a referência foi paga ({<Money amount={r.amounts.gross} />}). Os resultados desbloqueiam e
+                        a carteira de {a?.code ?? "agente"} é creditada.
                       </>
                     }
-                    confirmLabel="Registar liquidação"
+                    confirmLabel="Confirmar pagamento"
                     onConfirm={() =>
-                      report(useStore.getState().settleCommission(commission.id), "Comissão registada como liquidada.")
+                      report(useStore.getState().confirmReferencePayment(r.id, "admin"), "Pagamento confirmado.")
                     }
                   />
                 ) : (
                   <p className="text-xs text-ink-2">
-                    O cliente paga directamente ao agente. A plataforma só regista; nunca assume um pagamento sem a
-                    confirmação do agente.
+                    O cliente paga à plataforma pela referência Multicaixa. Nunca se assume um pagamento sem confirmação.
                   </p>
                 )}
               </div>
@@ -316,11 +309,11 @@ function Field({ label, children, mono }: { label: string; children: ReactNode; 
 function AssignBlock({ request: r }: { request: ServiceRequest }) {
   const [open, setOpen] = useState(false);
   const { agent, surface } = useLookups();
-  const eligible = useEligibleAgents(r.surfaceIds);
+  const eligible = useEligibleAgents(r.surfaceId);
   const current = r.agentId ? agent.get(r.agentId) : undefined;
   const canAssign = ASSIGNABLE.includes(r.status);
-  const coverage = (ids: string[]) => r.surfaceIds.filter((s) => ids.includes(s)).length;
-  const total = r.surfaceIds.length;
+  const coverage = (ids: string[]) => [r.surfaceId].filter((s) => ids.includes(s)).length;
+  const total = [r.surfaceId].length;
 
   return (
     <section className="flex flex-col gap-3">
@@ -485,19 +478,18 @@ function Answer({ request: r }: { request: ServiceRequest }) {
   const problems = useMemo(() => {
     const list: string[] = [];
     if (r.results.length === 0) return list;
-    const covered = new Set(r.results.map((x) => x.surfaceId));
-    for (const sid of r.surfaceIds)
-      if (!covered.has(sid)) list.push(`Sem resposta para ${surface.get(sid)?.name ?? sid}.`);
+    const covered = new Set(r.results.map((x) => x.itemId));
+    for (const it of r.items) if (!covered.has(it.id)) list.push(`Sem resposta para o item ${it.name}.`);
     for (const x of r.results) {
       const name = x.productName || "Produto";
-      if (x.notFound) list.push(`${name}: não encontrado em ${surface.get(x.surfaceId)?.name ?? x.surfaceId}.`);
+      if (x.notFound) list.push(`${name}: não encontrado em ${surface.get(r.surfaceId)?.name ?? r.surfaceId}.`);
       else {
         if (x.price == null) list.push(`${name}: falta o preço.`);
         if (x.photos.length === 0) list.push(`${name}: falta fotografia.`);
       }
     }
     return list;
-  }, [r.results, r.surfaceIds, surface]);
+  }, [r.results, r.items, r.surfaceId, surface]);
 
   if (r.results.length === 0) {
     return (
@@ -513,8 +505,8 @@ function Answer({ request: r }: { request: ServiceRequest }) {
     );
   }
 
-  const bySurface = r.surfaceIds
-    .map((sid) => ({ sid, items: r.results.filter((x) => x.surfaceId === sid) }))
+  const byItem = r.items
+    .map((it) => ({ sid: it.id, name: it.name, items: r.results.filter((x) => x.itemId === it.id) }))
     .filter((g) => g.items.length > 0);
 
   return (
@@ -569,11 +561,11 @@ function Answer({ request: r }: { request: ServiceRequest }) {
       </div>
 
       <div className="flex flex-col gap-6">
-        {bySurface.map(({ sid, items }) => (
+        {byItem.map(({ sid, name, items }) => (
           <div key={sid} className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold">
-              {surface.get(sid)?.name ?? sid}
-              <span className="font-normal text-ink-2"> · {surface.get(sid)?.area}</span>
+              {name}
+              <span className="font-normal text-ink-2"> · {surface.get(r.surfaceId)?.name}</span>
             </h3>
             <ul className="flex flex-col divide-y divide-line rounded-lg border border-line bg-surface">
               {items.map((x) => (

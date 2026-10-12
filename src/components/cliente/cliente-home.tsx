@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/empty-state";
 import { PriceTag } from "@/components/price-tag";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/lib/routes";
+import { requestTitle } from "@/lib/rules";
 import { useRequests, useStore } from "@/lib/store";
 import type { Client, RequestStatus, ServiceRequest } from "@/lib/types";
 import { ClientGate } from "./client-gate";
@@ -131,14 +132,14 @@ function PayCard({ request }: { request: ServiceRequest }) {
     >
       <div className="flex min-w-0 flex-col gap-1">
         <span className="font-mono text-[0.8125rem] font-medium text-ink tabular">{request.id}</span>
-        <p className="text-base leading-snug font-semibold text-ink">{request.description}</p>
+        <p className="text-base leading-snug font-semibold text-ink">{requestTitle(request)}</p>
         <p className="text-sm text-ink-2">
-          {surfaceNames(request.surfaceIds, map)}. O agente já respondeu: pague-lhe por Multicaixa Express para
+          {surfaceNames([request.surfaceId], map)}. O agente já respondeu: pague a referência Multicaixa para
           desbloquear os resultados.
         </p>
       </div>
       <div className="flex shrink-0 items-center justify-between gap-4 sm:flex-col sm:items-end">
-        <PriceTag amount={request.price} size="lg" label="Valor a pagar" />
+        <PriceTag amount={request.amounts.gross} size="lg" label="Valor a pagar" />
         <span className="inline-flex items-center gap-1.5 text-sm font-medium text-ink">
           Ver dados de pagamento
           <ArrowRightIcon className="size-4 transition-transform duration-150 ease-out group-hover:translate-x-0.5" />

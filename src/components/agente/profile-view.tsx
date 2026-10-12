@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatIban, isValidIban } from "@/lib/finance";
 import { formatDate, formatPhone } from "@/lib/format";
 import { useCurrentAgent, useStore } from "@/lib/store";
 import type { Agent } from "@/lib/types";
@@ -158,11 +159,9 @@ function Metric({ term, value }: { term: string; value: string }) {
   );
 }
 
+// TEMPORARY (domain step): IBAN + holder replace Multicaixa Express; the agente worker owns the final layout.
 const paySchema = z.object({
-  phone: z
-    .string()
-    .trim()
-    .refine((v) => v.replace(/\D/g, "").replace(/^244/, "").length === 9, "O número deve ter 9 dígitos."),
+  phone: z.string().trim().refine(isValidIban, "IBAN inválido: AO06 seguido de 21 dígitos."),
   holder: z.string().trim().min(3, "Indique o nome do titular."),
 });
 type PayValues = z.infer<typeof paySchema>;
@@ -171,25 +170,21 @@ function PaymentInfoSection({ agent }: { agent: Agent }) {
   const [editing, setEditing] = useState(false);
   const form = useForm<PayValues>({
     resolver: zodResolver(paySchema),
-    values: { phone: agent.paymentInfo.phone, holder: agent.paymentInfo.holder },
+    values: { phone: agent.bank ? formatIban(agent.bank.iban) : "", holder: agent.bank?.holder ?? agent.name },
   });
   const { errors } = form.formState;
 
   function save(v: PayValues) {
-    const res = useStore.getState().updateAgentPaymentInfo(agent.id, {
-      method: "multicaixa-express",
-      phone: formatPhone(v.phone),
-      holder: v.holder,
-    });
+    const res = useStore.getState().updateAgentBank(agent.id, { iban: v.phone, holder: v.holder });
     if (!res.ok) return toast.error(res.error);
-    toast.success("Dados de pagamento actualizados");
+    toast.success("Dados bancários actualizados");
     setEditing(false);
   }
 
   return (
     <section aria-labelledby="pagamento" className="mt-8 flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
-        <SectionTitle id="pagamento">Multicaixa Express</SectionTitle>
+        <SectionTitle id="pagamento">Conta bancária</SectionTitle>
         {!editing && (
           <Button variant="ghost" size="sm" onClick={() => setEditing(true)} className="-mr-2">
             <PencilSimpleIcon />
@@ -197,7 +192,7 @@ function PaymentInfoSection({ agent }: { agent: Agent }) {
           </Button>
         )}
       </div>
-      <p className="text-sm text-ink-2">É para aqui que os clientes pagam as suas consultas.</p>
+      <p className="text-sm text-ink-2">Os levantamentos da sua carteira são transferidos para este IBAN.</p>
 
       {editing ? (
         <form
@@ -206,11 +201,11 @@ function PaymentInfoSection({ agent }: { agent: Agent }) {
           className="flex flex-col gap-4 rounded-lg bg-surface p-4 ring-1 ring-line"
         >
           <div className="flex flex-col gap-2">
-            <Label htmlFor="mcx-phone">Número Multicaixa Express</Label>
+            <Label htmlFor="mcx-phone">IBAN</Label>
             <Input
               id="mcx-phone"
-              inputMode="tel"
-              autoComplete="tel"
+              autoCapitalize="characters"
+              autoComplete="off"
               className="h-12 font-mono tabular"
               aria-invalid={!!errors.phone}
               {...form.register("phone")}
@@ -238,10 +233,10 @@ function PaymentInfoSection({ agent }: { agent: Agent }) {
         </form>
       ) : (
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-lg bg-surface p-4 text-[0.9375rem] ring-1 ring-line">
-          <dt className="text-ink-2">Número</dt>
-          <dd className="font-mono text-ink tabular">{agent.paymentInfo.phone}</dd>
+          <dt className="text-ink-2">IBAN</dt>
+          <dd className="font-mono text-ink tabular">{agent.bank ? formatIban(agent.bank.iban) : "Por registar"}</dd>
           <dt className="text-ink-2">Titular</dt>
-          <dd className="text-ink">{agent.paymentInfo.holder}</dd>
+          <dd className="text-ink">{agent.bank?.holder ?? "Por registar"}</dd>
         </dl>
       )}
     </section>

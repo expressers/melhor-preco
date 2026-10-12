@@ -13,7 +13,7 @@ import type { ResultItem, ServiceRequest, Surface } from "@/lib/types";
 export function ResultsBoard({ request, surfaces }: { request: ServiceRequest; surfaces: Map<string, Surface> }) {
   const prices = request.results.filter((r) => !r.notFound && r.price != null).map((r) => r.price!);
   const best = prices.length > 1 ? Math.min(...prices) : undefined;
-  const cols = Math.min(request.surfaceIds.length, 3);
+  const cols = Math.min(request.items.length, 3);
 
   return (
     <div className="flex flex-col gap-5">
@@ -21,16 +21,16 @@ export function ResultsBoard({ request, surfaces }: { request: ServiceRequest; s
         className="grid gap-x-5 gap-y-8 md:grid-cols-[repeat(var(--cols),minmax(0,1fr))]"
         style={{ "--cols": cols } as React.CSSProperties}
       >
-        {request.surfaceIds.map((sid) => {
-          const surface = surfaces.get(sid);
-          const items = request.results.filter((r) => r.surfaceId === sid);
+        {request.items.map(({ id: sid, name: itemName }) => {
+          const surface = surfaces.get(request.surfaceId);
+          const items = request.results.filter((r) => r.itemId === sid);
           const found = items.filter((r) => !r.notFound).length;
           return (
             <section key={sid} aria-labelledby={`sf-${sid}`} className="flex min-w-0 flex-col gap-3">
               <header className="flex items-baseline justify-between gap-3 border-b-2 border-ink pb-2">
                 <div className="min-w-0">
                   <h3 id={`sf-${sid}`} className="truncate text-lg">
-                    {surface?.name ?? sid}
+                    {itemName}
                   </h3>
                   {surface && <p className="text-[0.8125rem] text-ink-2">{surface.area}</p>}
                 </div>

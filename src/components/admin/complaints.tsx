@@ -1,5 +1,6 @@
 "use client";
 
+import { requestTitle } from "@/lib/rules";
 import { ChatCircleIcon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useState } from "react";
@@ -97,7 +98,7 @@ export function AdminComplaints() {
                       </>
                     )}
                   </p>
-                  {r && <p className="truncate text-ink-2">Pedido: {r.description}</p>}
+                  {r && <p className="truncate text-ink-2">Pedido: {requestTitle(r)}</p>}
                   {c.resolution && (
                     <p className="measure rounded-lg bg-paper-2 px-3 py-2">
                       <span className="text-ink-2">Resolução{c.resolvedAt ? ` (${formatDateTime(c.resolvedAt)})` : ""}: </span>

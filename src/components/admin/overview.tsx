@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatDate, formatNumber, formatRelative } from "@/lib/format";
 import { REQUEST_STATUS, REQUEST_STATUS_ORDER, type Tone } from "@/lib/labels";
 import { routes } from "@/lib/routes";
-import { computeIncomplete, getFlags } from "@/lib/rules";
+import { computeIncomplete, getFlags, requestTitle } from "@/lib/rules";
 import { useFinanceSummary, useStore } from "@/lib/store";
 import type { ServiceRequest } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -52,7 +52,7 @@ export function AdminOverview() {
     const routed = requests.filter((r) => r.agentId || r.rejections.length > 0);
     const rejected = routed.filter((r) => r.rejections.length > 0).length;
     const withAnswer = requests.filter((r) => r.results.length > 0);
-    const incomplete = withAnswer.filter((r) => computeIncomplete(r.results, r.surfaceIds)).length;
+    const incomplete = withAnswer.filter((r) => computeIncomplete(r.results, r.items)).length;
     const openComplaints = complaints.filter((c) => c.status !== "resolvida").length;
     const byStatus = Object.fromEntries(
       REQUEST_STATUS_ORDER.map((s) => [s, requests.filter((r) => r.status === s).length]),
@@ -153,7 +153,7 @@ export function AdminOverview() {
                               <Code>{r.id}</Code>
                               {r.priority === "urgente" && <ToneBadge tone="tag">Urgente</ToneBadge>}
                             </span>
-                            <span className="truncate text-ink-2">{r.description}</span>
+                            <span className="truncate text-ink-2">{requestTitle(r)}</span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -239,9 +239,9 @@ export function AdminOverview() {
             />
             <ReceiptRow label="Avaliação dos clientes" value="sem dados" mono={false} />
             <ReceiptRule />
-            <ReceiptRow label="Comissão devida" value={<Money amount={finance.commissionDue} />} />
-            <ReceiptRow label="Comissão liquidada" value={<Money amount={finance.commissionSettled} />} />
-            <ReceiptRow label="Por pagar aos agentes" value={<Money amount={finance.agentDue} />} />
+            <ReceiptRow label="Facturação líquida" value={<Money amount={finance.net} />} />
+            <ReceiptRow label="Plataforma" value={<Money amount={finance.platform} />} />
+            <ReceiptRow label="Levantamentos por confirmar" value={<Money amount={finance.withdrawalsPending} />} />
             <ReceiptNote className="pb-1">
               O tempo de resposta conta do pedido até à resposta do agente. A plataforma ainda não recolhe
               avaliações dos clientes, por isso não há nota a mostrar.

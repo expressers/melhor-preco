@@ -23,7 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatDate, formatNumber, formatTime } from "@/lib/format";
 import { OPEN_STATUSES, REQUEST_STATUS, REQUEST_STATUS_ORDER } from "@/lib/labels";
 import { routes } from "@/lib/routes";
-import { getFlags } from "@/lib/rules";
+import { getFlags, requestTitle } from "@/lib/rules";
 import { useRequests } from "@/lib/store";
 import type { RequestStatus, ServiceRequest } from "@/lib/types";
 import { Code, FlagBadges, Panel, SearchField, matches, useLookups, useNow } from "./kit";
@@ -74,7 +74,7 @@ export function AdminRequests() {
           return false;
         const c = client.get(r.clientId);
         const a = r.agentId ? agent.get(r.agentId) : undefined;
-        return matches(query, r.id, r.description, r.brand, c?.name, c?.phone, a?.code, a?.name);
+        return matches(query, r.id, requestTitle(r), r.items[0].brand, c?.name, c?.phone, a?.code, a?.name);
       }),
     [requests, filter, query, client, agent, now],
   );
@@ -166,13 +166,13 @@ export function AdminRequests() {
                           </Link>
                           {r.priority === "urgente" && <ToneBadge tone="tag">Urgente</ToneBadge>}
                         </span>
-                        <span className="truncate text-ink-2">{r.description}</span>
+                        <span className="truncate text-ink-2">{requestTitle(r)}</span>
                       </div>
                     </TableCell>
                     <TableCell className="py-3 whitespace-nowrap">{client.get(r.clientId)?.name ?? "-"}</TableCell>
                     <TableCell className="max-w-[14rem] py-3 text-ink-2">
                       <span className="line-clamp-2 whitespace-normal">
-                        {r.surfaceIds.map((id) => surface.get(id)?.name ?? id).join(", ")}
+                        {[r.surfaceId].map((id) => surface.get(id)?.name ?? id).join(", ")}
                       </span>
                     </TableCell>
                     <TableCell className="py-3">
@@ -185,7 +185,7 @@ export function AdminRequests() {
                       </div>
                     </TableCell>
                     <TableCell className="py-3 text-right">
-                      <Money amount={r.price} />
+                      <Money amount={r.amounts.gross} />
                     </TableCell>
                     <TableCell className="py-3 pr-4 text-right font-mono text-xs whitespace-nowrap text-ink-2 tabular">
                       {formatDate(r.createdAt)}
