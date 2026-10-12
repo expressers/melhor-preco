@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BankIcon,
   ChatCircleIcon,
   ClockIcon,
   GearIcon,
@@ -8,7 +9,9 @@ import {
   IdentificationCardIcon,
   ListIcon,
   PlusIcon,
+  ReceiptIcon,
   StorefrontIcon,
+  TargetIcon,
   UserIcon,
   UsersIcon,
   WalletIcon,
@@ -40,20 +43,25 @@ const ICONS: Record<NavItem["icon"], Icon> = {
   gear: GearIcon,
   chat: ChatCircleIcon,
   identification: IdentificationCardIcon,
+  target: TargetIcon,
+  bank: BankIcon,
+  receipt: ReceiptIcon,
 };
 
 const AREA_LABEL: Record<Role, string> = {
   cliente: "Cliente",
   agente: "Agente",
+  operador: "Operador",
   admin: "Administração",
 };
 
 /** Container width per area (header and main share it so edges line up). */
-const WIDTH = {
+const WIDTH: Record<Role, string> = {
   cliente: "max-w-5xl",
   agente: "max-w-3xl",
+  operador: "max-w-4xl",
   admin: "max-w-[1400px]",
-} as const;
+};
 
 const strip = (p: string) => (p.length > 1 ? p.replace(/\/+$/, "") : p);
 

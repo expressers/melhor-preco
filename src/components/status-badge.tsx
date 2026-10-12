@@ -2,19 +2,29 @@ import { Badge } from "@/components/ui/badge";
 import {
   AGENT_STATUS,
   AVAILABILITY,
+  CLIENT_KIND,
   CLIENT_STATUS,
   COMPLAINT_STATUS,
-  LEDGER_STATUS,
+  OBJECTIVE_STATUS,
+  OPERATOR_STATUS,
+  REFERENCE_STATUS,
+  REQUEST_KIND,
   REQUEST_STATUS,
+  WITHDRAWAL_STATUS,
   type Tone,
 } from "@/lib/labels";
 import type {
   AgentStatus,
   Availability,
+  ClientKind,
   ClientStatus,
   ComplaintStatus,
-  LedgerStatus,
+  ObjectiveStatus,
+  OperatorStatus,
+  ReferenceStatus,
+  RequestKind,
   RequestStatus,
+  WithdrawalStatus,
 } from "@/lib/types";
 
 /** Pill in one of the state tones. Use the typed wrappers below when you can. */
@@ -62,9 +72,45 @@ export function ClientStatusBadge({ status, className }: { status: ClientStatus;
   return <ToneBadge tone={s.tone} className={className}>{s.label}</ToneBadge>;
 }
 
-export function LedgerStatusBadge({ status, className }: { status: LedgerStatus; className?: string }) {
-  const s = LEDGER_STATUS[status];
+export function WithdrawalStatusBadge({ status, className }: { status: WithdrawalStatus; className?: string }) {
+  const s = WITHDRAWAL_STATUS[status];
   return <ToneBadge tone={s.tone} className={className}>{s.label}</ToneBadge>;
+}
+
+/** Pass `referenceDisplayStatus(ref)` from @/lib/finance so expiry shows. */
+export function ReferenceStatusBadge({
+  status,
+  className,
+}: {
+  status: ReferenceStatus | "expirada";
+  className?: string;
+}) {
+  const s = REFERENCE_STATUS[status];
+  return <ToneBadge tone={s.tone} className={className}>{s.label}</ToneBadge>;
+}
+
+export function OperatorStatusBadge({ status, className }: { status: OperatorStatus; className?: string }) {
+  const s = OPERATOR_STATUS[status];
+  return <ToneBadge tone={s.tone} className={className}>{s.label}</ToneBadge>;
+}
+
+/** Pass `objectiveStatus(obj)` from @/lib/objectives (time-derived). */
+export function ObjectiveStatusBadge({ status, className }: { status: ObjectiveStatus; className?: string }) {
+  const s = OBJECTIVE_STATUS[status];
+  return <ToneBadge tone={s.tone} className={className}>{s.label}</ToneBadge>;
+}
+
+export function RequestKindBadge({ kind, className }: { kind: RequestKind; className?: string }) {
+  const s = REQUEST_KIND[kind];
+  return <ToneBadge tone={s.tone} className={className}>{s.label}</ToneBadge>;
+}
+
+export function ClientKindBadge({ kind, className }: { kind: ClientKind; className?: string }) {
+  return (
+    <ToneBadge tone={kind === "empresa" ? "info" : "neutral"} className={className}>
+      {CLIENT_KIND[kind].label}
+    </ToneBadge>
+  );
 }
 
 export function ComplaintStatusBadge({

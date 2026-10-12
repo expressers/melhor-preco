@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 const ROLE_LABEL: Record<AuditEvent["role"], string> = {
   cliente: "Cliente",
   agente: "Agente",
+  operador: "Operador",
   admin: "Admin",
   sistema: "Sistema",
 };

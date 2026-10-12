@@ -24,7 +24,9 @@ export function NotificationCentre() {
       ? (session.currentClientId ?? undefined)
       : session.viewAs === "agente"
         ? (session.currentAgentId ?? undefined)
-        : undefined;
+        : session.viewAs === "operador"
+          ? (session.currentOperatorId ?? undefined)
+          : undefined;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

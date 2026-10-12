@@ -14,17 +14,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AGENT_STATUS, ROLE } from "@/lib/labels";
+import { AGENT_STATUS, CLIENT_KIND, OPERATOR_STATUS, ROLE } from "@/lib/labels";
+import { clientDisplayName } from "@/lib/rules";
 import { useHydrated, useStore } from "@/lib/store";
 import type { Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const ROLES: Role[] = ["cliente", "agente", "admin"];
+const ROLES: Role[] = ["cliente", "agente", "operador", "admin"];
 
 /**
- * Demo selector "Ver como: Cliente / Agente / Admin" (BRIEF §9). Sets the role
+ * Demo selector "Ver como: Cliente / Agente / Operador / Admin". Sets the role
  * in the store and navigates to that area. Also lets the demo pick which
- * agent or client is acting, and resets the demo data.
+ * agent, operator or client is acting, and resets the demo data.
  */
 export function ViewAsSwitcher({ className }: { className?: string }) {
   const router = useRouter();
@@ -32,6 +33,9 @@ export function ViewAsSwitcher({ className }: { className?: string }) {
   const session = useStore((s) => s.session);
   const agents = useStore((s) => s.agents);
   const clients = useStore((s) => s.clients);
+  const operators = useStore((s) => s.operators);
+  const surfaces = useStore((s) => s.surfaces);
+  const setCurrentOperator = useStore((s) => s.setCurrentOperator);
   const setViewAs = useStore((s) => s.setViewAs);
   const setCurrentAgent = useStore((s) => s.setCurrentAgent);
   const setCurrentClient = useStore((s) => s.setCurrentClient);
@@ -89,6 +93,35 @@ export function ViewAsSwitcher({ className }: { className?: string }) {
           </>
         )}
 
+        {session.viewAs === "operador" && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Operador em demonstração</DropdownMenuLabel>
+            <div className="max-h-56 overflow-y-auto">
+              <DropdownMenuRadioGroup
+                value={session.currentOperatorId ?? ""}
+                onValueChange={(id) => {
+                  setCurrentOperator(id);
+                  router.push(ROLE.operador.home);
+                }}
+              >
+                {operators.map((o) => (
+                  <DropdownMenuRadioItem key={o.id} value={o.id} className="items-start">
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate">
+                        <span className="font-mono tabular">{o.code}</span> {o.name}
+                      </span>
+                      <span className="text-xs text-ink-2">
+                        {surfaces.find((s) => s.id === o.surfaceId)?.name ?? o.surfaceId} · {OPERATOR_STATUS[o.status].label}
+                      </span>
+                    </span>
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </div>
+          </>
+        )}
+
         {session.viewAs === "cliente" && (
           <>
             <DropdownMenuSeparator />
@@ -102,8 +135,14 @@ export function ViewAsSwitcher({ className }: { className?: string }) {
                 }}
               >
                 {clients.map((c) => (
-                  <DropdownMenuRadioItem key={c.id} value={c.id}>
-                    <span className="truncate">{c.name}</span>
+                  <DropdownMenuRadioItem key={c.id} value={c.id} className="items-start">
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate">{clientDisplayName(c)}</span>
+                      <span className="text-xs text-ink-2">
+                        {CLIENT_KIND[c.kind].label}
+                        {c.kind === "empresa" ? ` · ${c.name}` : ""}
+                      </span>
+                    </span>
                   </DropdownMenuRadioItem>
                 ))}
               </DropdownMenuRadioGroup>
@@ -114,10 +153,9 @@ export function ViewAsSwitcher({ className }: { className?: string }) {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={() => {
-            // Stay in the area being viewed: reset() would fall back to "cliente".
+            // reset() keeps session.viewAs: stay in the area being viewed.
             const role = session.viewAs;
             reset();
-            setViewAs(role);
             toast.success("Dados de demonstração repostos.");
             router.push(ROLE[role].home);
           }}
