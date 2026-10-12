@@ -688,6 +688,20 @@ export const useStore = create<Store>()(
           if (status === "resposta_submetida") return fail("A resposta é submetida pelo agente.");
           if (status === "cancelado") return get().cancelRequest(requestId, note ?? "Cancelado pela administração", "admin");
           if (["agente_atribuido", "em_consulta"].includes(status) && !r.agentId) return fail("Atribua primeiro um agente.");
+          // "Devolver ao agente": an unpaid answer goes back to em_consulta and its reference is annulled.
+          if (r.status === "resposta_submetida" && status === "em_consulta") {
+            patchRequest(
+              requestId,
+              (x) => ({ status: "em_consulta", reference: x.reference ? { ...x.reference, status: "anulada" } : undefined }),
+              [event("admin", "Resposta devolvida ao agente", note), event("sistema", "Referência Multicaixa anulada")],
+              undefined,
+              [
+                notify({ role: "cliente", userId: r.clientId, requestId, title: "Resposta em revisão", body: `A resposta do pedido ${requestId} voltou ao agente para correcção. A referência anterior foi anulada.` }),
+                ...(r.agentId ? [notify({ role: "agente", userId: r.agentId, requestId, title: "Resposta devolvida", body: note ?? "Corrija e submeta de novo." })] : []),
+              ],
+            );
+            return { ok: true };
+          }
           if (!["submetido", "aguarda_atribuicao", "agente_atribuido", "em_consulta"].includes(r.status))
             return fail("Este pedido já tem resposta: o estado não pode recuar.");
           patchRequest(
@@ -1382,7 +1396,7 @@ export function useSurfaceAgents(surfaceId: string | undefined): { agent: Agent;
 }
 
 /** Wallet of an agent (defaults to the current agent) + withdrawal eligibility now. */
-export function useWallet(agentId?: string | null): (WalletSummary & { check: WithdrawCheck }) | undefined {
+export function useWallet(agentId?: string | null, now?: number): (WalletSummary & { check: WithdrawCheck }) | undefined {
   const currentId = useStore((s) => s.session.currentAgentId);
   const agents = useStore((s) => s.agents);
   const earnings = useStore((s) => s.earnings);
@@ -1392,8 +1406,8 @@ export function useWallet(agentId?: string | null): (WalletSummary & { check: Wi
     const agent = agents.find((a) => a.id === id);
     if (!agent) return undefined;
     const w = computeWallet(agent.id, earnings, withdrawals);
-    return { ...w, check: canWithdraw({ agent, withdrawals, available: w.available }) };
-  }, [agents, earnings, withdrawals, id]);
+    return { ...w, check: canWithdraw({ agent, withdrawals, available: w.available, now }) };
+  }, [agents, earnings, withdrawals, id, now]);
 }
 
 /** Objectives (optionally filtered), newest period first. */
@@ -1416,16 +1430,19 @@ export function useObjectiveEvaluation(objective: Objective | undefined): Object
   return useMemo(() => (objective ? evaluateObjective(objective, requests, split) : undefined), [objective, requests, split]);
 }
 
-/** Objective of the period running now for a surface (operator home). */
-export function useCurrentObjective(surfaceId: string | undefined): Objective | undefined {
+/**
+ * Objective of the period running at `now` for a surface (operator home).
+ * Pass a clock value from a hook (e.g. admin kit `useNow()`), not Date.now() in render.
+ */
+export function useCurrentObjective(surfaceId: string | undefined, now: number): Objective | undefined {
   const objectives = useStore((s) => s.objectives);
   return useMemo(() => {
     if (!surfaceId) return undefined;
-    const t = Date.now();
+    const t = now;
     return objectives.find(
       (o) => o.surfaceId === surfaceId && o.status !== "closed" && new Date(o.period.startsAt).getTime() <= t && t < new Date(o.period.endsAt).getTime(),
     );
-  }, [objectives, surfaceId]);
+  }, [objectives, surfaceId, now]);
 }
 
 /** Closed objectives credited to an operator (commission history). */

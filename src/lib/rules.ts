@@ -2,7 +2,7 @@
 // the store, the data layer, mocks and, later, a server.
 
 import { OPEN_STATUSES, UNLOCKED_STATUSES } from "./labels";
-import type { Agent, Client, Operator, RequestItem, ResultItem, ServiceRequest } from "./types";
+import type { Agent, Client, ItemVariations, Operator, RequestItem, ResultItem, ServiceRequest } from "./types";
 
 const HOUR = 60 * 60 * 1000;
 
@@ -82,6 +82,17 @@ export function clientDisplayName(c: Pick<Client, "kind" | "name" | "company">):
 export function requestTitle(req: Pick<ServiceRequest, "items">): string {
   const first = req.items[0]?.name ?? "Consulta";
   return req.items.length > 1 ? `${first} + ${req.items.length - 1} ${req.items.length === 2 ? "item" : "itens"}` : first;
+}
+
+/** "Modelos: A ou B · Cores: preto · Tamanhos: M, L" (undefined when empty). */
+export function formatVariations(v: ItemVariations | undefined): string | undefined {
+  if (!v) return undefined;
+  const parts = [
+    v.models && `Modelos: ${v.models}`,
+    v.colours && `Cores: ${v.colours}`,
+    v.sizes && `Tamanhos: ${v.sizes}`,
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : undefined;
 }
 
 export type AgentAvailability = "disponivel" | "em_consulta";
