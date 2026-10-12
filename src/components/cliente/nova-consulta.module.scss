@@ -1,0 +1,40 @@
+@use "../../styles/mixins" as *;
+
+// A newly added item slides in once (occasional action, gives spatial context).
+.itemEnter {
+  animation: item-in $dur-slow $ease-out both;
+}
+
+// The talão total re-prints when the kind or price changes.
+.reprint {
+  animation: reprint $dur $ease-out both;
+}
+
+@keyframes item-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes reprint {
+  from {
+    opacity: 0.4;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@include reduced-motion {
+  .itemEnter,
+  .reprint {
+    animation: none;
+  }
+}
