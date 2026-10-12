@@ -23,8 +23,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { NBSP } from "@/lib/format";
 import { getFlags } from "@/lib/rules";
-import { useStore, type ActionResult } from "@/lib/store";
-import type { Agent, Client, ServiceRequest, Surface } from "@/lib/types";
+import { Timeline } from "@/components/timeline";
+import { luandaDayKey } from "@/lib/finance";
+import { useAudit, useStore, type ActionResult } from "@/lib/store";
+import type { Agent, AuditLogEntry, Client, Operator, ServiceRequest, Surface } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** Toast the outcome of a store action. Returns true when it succeeded. */
@@ -60,13 +62,15 @@ export function useLookups() {
   const agents = useStore((s) => s.agents);
   const clients = useStore((s) => s.clients);
   const surfaces = useStore((s) => s.surfaces);
+  const operators = useStore((s) => s.operators);
   return useMemo(
     () => ({
       agent: new Map<string, Agent>(agents.map((a) => [a.id, a])),
       client: new Map<string, Client>(clients.map((c) => [c.id, c])),
       surface: new Map<string, Surface>(surfaces.map((s) => [s.id, s])),
+      operator: new Map<string, Operator>(operators.map((o) => [o.id, o])),
     }),
-    [agents, clients, surfaces],
+    [agents, clients, surfaces, operators],
   );
 }
 
@@ -86,6 +90,28 @@ export function formatDuration(ms: number): string {
   const h = Math.floor(min / 60);
   if (h < 24) return `${h}${NBSP}h ${min % 60}${NBSP}min`;
   return `${Math.floor(h / 24)}${NBSP}d ${h % 24}${NBSP}h`;
+}
+
+const MONTHS_LONG = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+/** Luanda month of an ISO date: "2026-10". */
+export function monthKeyOf(iso: string): string {
+  return luandaDayKey(iso).slice(0, 7);
+}
+
+/** "2026-10" -> "Outubro 2026" */
+export function monthLabel(key: string): string {
+  const [y, m] = key.split("-").map(Number);
+  return `${MONTHS_LONG[m - 1]} ${y}`;
+}
+
+/** Whole number from a text field ("12 000" ok); NaN when empty or invalid. */
+export function parseIntField(v: string): number {
+  const t = v.replace(/\s/g, "");
+  return t === "" || !/^\d+$/.test(t) ? NaN : Number(t);
 }
 
 // --- Bits of UI --------------------------------------------------------------
@@ -190,6 +216,34 @@ export function FlagBadges({ request, now }: { request: ServiceRequest; now: num
   );
 }
 
+/** Audit log of one entity type (or one entity), newest first, in a panel. */
+export function AuditTrail({
+  entity,
+  entityId,
+  filter,
+  limit = 12,
+  empty = "Ainda sem registos.",
+}: {
+  entity: AuditLogEntry["entity"];
+  entityId?: string;
+  filter?: (e: AuditLogEntry) => boolean;
+  limit?: number;
+  empty?: string;
+}) {
+  const all = useAudit({ entity, entityId });
+  const list = (filter ? all.filter(filter) : all).slice(0, limit);
+  return (
+    <div className="rounded-lg border border-line bg-surface p-5">
+      {list.length === 0 ? (
+        <p className="text-sm text-ink-2">{empty}</p>
+      ) : (
+        // useAudit is newest first; Timeline takes chronological input.
+        <Timeline events={[...list].reverse()} newestFirst />
+      )}
+    </div>
+  );
+}
+
 // --- Confirmation dialog -----------------------------------------------------
 
 export interface ConfirmDialogProps {
@@ -199,7 +253,7 @@ export interface ConfirmDialogProps {
   confirmLabel: string;
   destructive?: boolean;
   /** Ask for a free-text reason (suspension, cancellation, resolution). */
-  reason?: { label: string; placeholder?: string; required?: boolean };
+  reason?: { label: string; placeholder?: string; required?: boolean; singleLine?: boolean; minLength?: number };
   /** Return true to close the dialog (i.e. the action succeeded). */
   onConfirm: (reason: string) => boolean;
 }
@@ -221,6 +275,10 @@ export function ConfirmDialog({
   const submit = () => {
     if (reason?.required && !text.trim()) {
       setError("Este campo é obrigatório.");
+      return;
+    }
+    if (reason?.minLength && text.trim().length < reason.minLength) {
+      setError(`Escreva pelo menos ${reason.minLength} caracteres.`);
       return;
     }
     if (onConfirm(text.trim())) {
@@ -247,18 +305,37 @@ export function ConfirmDialog({
         {reason && (
           <div className="flex flex-col gap-2">
             <Label htmlFor="confirm-reason">{reason.label}</Label>
-            <Textarea
-              id="confirm-reason"
-              value={text}
-              onChange={(e) => {
-                setText(e.target.value);
-                if (error) setError(null);
-              }}
-              placeholder={reason.placeholder}
-              aria-invalid={!!error}
-              aria-describedby={error ? "confirm-reason-error" : undefined}
-              rows={3}
-            />
+            {reason.singleLine ? (
+              <Input
+                id="confirm-reason"
+                value={text}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  if (error) setError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submit();
+                }}
+                placeholder={reason.placeholder}
+                aria-invalid={!!error}
+                aria-describedby={error ? "confirm-reason-error" : undefined}
+                className="h-11 font-mono tabular"
+                autoComplete="off"
+              />
+            ) : (
+              <Textarea
+                id="confirm-reason"
+                value={text}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  if (error) setError(null);
+                }}
+                placeholder={reason.placeholder}
+                aria-invalid={!!error}
+                aria-describedby={error ? "confirm-reason-error" : undefined}
+                rows={3}
+              />
+            )}
             {error && (
               <p id="confirm-reason-error" className="text-sm text-error">
                 {error}

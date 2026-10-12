@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
 import { Money } from "@/components/price-tag";
 import { Receipt, ReceiptRow, ReceiptRule } from "@/components/receipt";
-import { AgentStatusBadge, StatusBadge } from "@/components/status-badge";
+import { AgentStatusBadge, StatusBadge, WithdrawalStatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -29,7 +29,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate, formatNumber, formatPhone } from "@/lib/format";
-import { formatIban } from "@/lib/finance";
+import { formatIban, maskIban } from "@/lib/finance";
 import { AGENT_STATUS } from "@/lib/labels";
 import { routes } from "@/lib/routes";
 import { computeIncomplete, requestTitle } from "@/lib/rules";
@@ -142,6 +142,7 @@ export function AdminAgents() {
               <TableRow className="hover:bg-transparent">
                 <TableHead className="pl-4">Agente</TableHead>
                 <TableHead>Superfícies</TableHead>
+                <TableHead>IBAN</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Tarefas</TableHead>
                 <TableHead className="text-right">Concluídas</TableHead>
@@ -176,6 +177,15 @@ export function AdminAgents() {
                       <span className="line-clamp-2 whitespace-normal">
                         {a.surfaceIds.length ? a.surfaceIds.map((s) => surface.get(s)?.name ?? s).join(", ") : "Nenhuma"}
                       </span>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {a.bank ? (
+                        <span className="font-mono text-xs tabular" title={a.bank.holder}>
+                          {maskIban(a.bank.iban)}
+                        </span>
+                      ) : (
+                        <span className="text-ink-2">Por registar</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <AgentStatusBadge status={a.status} />
@@ -276,8 +286,8 @@ function RegisterAgent({ onCreated }: { onCreated: (id: string) => void }) {
         <DialogHeader>
           <DialogTitle className="text-lg">Registar agente</DialogTitle>
           <DialogDescription className="text-ink-2">
-            O agente fica pendente de aprovação. O número Multicaixa Express começa igual ao telefone e pode ser
-            alterado depois.
+            O agente fica pendente de aprovação. O IBAN para levantamentos é registado pelo próprio agente no
+            perfil.
           </DialogDescription>
         </DialogHeader>
         <form id="register-agent" onSubmit={submit} className="flex flex-col gap-4" noValidate>
@@ -465,7 +475,7 @@ function AgentProfile({ agent: a, perf }: { agent: Agent; perf: Performance }) {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h3 className="text-base font-semibold">Desempenho e pagamentos</h3>
+        <h3 className="text-base font-semibold">Desempenho e carteira</h3>
         <Receipt title="Ficha do agente" meta={a.code}>
           <ReceiptRow label="Tarefas atribuídas" value={formatNumber(perf.tasks.length)} />
           <ReceiptRow label="Respondidas" value={formatNumber(perf.answered)} />
@@ -491,9 +501,11 @@ function AgentProfile({ agent: a, perf }: { agent: Agent; perf: Performance }) {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h3 className="text-base font-semibold">Histórico de pagamentos</h3>
+        <h3 className="text-base font-semibold">Ganhos por pedido</h3>
         {entries.length === 0 ? (
-          <p className="text-sm text-ink-2">Sem movimentos. Os valores aparecem quando o agente responde a um pedido.</p>
+          <p className="text-sm text-ink-2">
+            Sem ganhos ainda. O agente recebe 60% do líquido quando a plataforma confirma o pagamento da referência.
+          </p>
         ) : (
           <Panel>
             <Table>
@@ -524,6 +536,27 @@ function AgentProfile({ agent: a, perf }: { agent: Agent; perf: Performance }) {
             </Table>
           </Panel>
         )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h3 className="text-base font-semibold">Levantamentos</h3>
+        {wallet.withdrawals.length === 0 ? (
+          <p className="text-sm text-ink-2">Ainda sem pedidos de levantamento.</p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-line rounded-lg border border-line bg-surface">
+            {wallet.withdrawals.map((w) => (
+              <li key={w.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm">
+                <Code>{w.id.toUpperCase()}</Code>
+                <Money amount={w.amount} />
+                <span className="min-w-0 flex-1 font-mono text-xs text-ink-2 tabular">{formatDate(w.requestedAt)}</span>
+                <WithdrawalStatusBadge status={w.status} />
+              </li>
+            ))}
+          </ul>
+        )}
+        <Button asChild variant="link" size="sm" className="self-start">
+          <Link href={routes.admin.levantamentos}>Tratar levantamentos</Link>
+        </Button>
       </section>
 
       <section className="flex flex-col gap-3">
