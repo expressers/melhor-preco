@@ -1,18 +1,21 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { EyeIcon, EyeSlashIcon } from "@phosphor-icons/react";
+import { BuildingsIcon, EyeIcon, EyeSlashIcon, UserIcon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { TagMark } from "@/components/price-tag";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { isValidNif } from "@/lib/finance";
+import { CLIENT_KIND } from "@/lib/labels";
 import { routes } from "@/lib/routes";
 import { useCurrentClient, useStore } from "@/lib/store";
+import type { ClientKind } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { describedBy, Field } from "./field";
 
@@ -30,15 +33,26 @@ const loginSchema = z.object({
   password: z.string().min(1, "Escreva a sua palavra-passe."),
 });
 
-const registerSchema = z.object({
-  name: z.string().trim().min(3, "Escreva o seu nome, como quer que o agente o trate."),
-  phone,
-  password: z.string().min(6, "Use pelo menos 6 caracteres."),
-  email: z
-    .string()
-    .trim()
-    .refine((v) => v === "" || z.email().safeParse(v).success, { message: "Este e-mail não parece válido." }),
-});
+const registerSchema = z
+  .object({
+    kind: z.enum(["particular", "empresa"]),
+    companyName: z.string().trim(),
+    nif: z.string().trim(),
+    name: z.string().trim().min(3, "Escreva o nome, como quer que o agente o trate."),
+    phone,
+    password: z.string().min(6, "Use pelo menos 6 caracteres."),
+    email: z
+      .string()
+      .trim()
+      .refine((v) => v === "" || z.email().safeParse(v).success, { message: "Este e-mail não parece válido." }),
+  })
+  .superRefine((v, ctx) => {
+    if (v.kind !== "empresa") return;
+    if (v.companyName.length < 2)
+      ctx.addIssue({ code: "custom", path: ["companyName"], message: "Escreva o nome da empresa." });
+    if (!isValidNif(v.nif))
+      ctx.addIssue({ code: "custom", path: ["nif"], message: "O NIF tem 9 a 14 caracteres, por exemplo 5417893021." });
+  });
 
 type LoginValues = z.infer<typeof loginSchema>;
 type RegisterValues = z.infer<typeof registerSchema>;
@@ -54,7 +68,7 @@ export function EntrarForm() {
         <h1 className="text-[1.75rem]">{mode === "criar" ? "Criar a sua conta" : "Entrar na sua conta"}</h1>
         <p className="text-[0.9375rem] text-ink-2">
           {mode === "criar"
-            ? "O telefone é o seu contacto principal: é por ele que entra e que o agente o identifica."
+            ? "Para si ou para a sua empresa. O telefone é o contacto principal: é por ele que entra na conta."
             : "Entre com o telefone e a palavra-passe que usou ao criar a conta."}
         </p>
       </div>
@@ -96,7 +110,8 @@ export function EntrarForm() {
       <p className="rounded-lg bg-paper-2 px-4 py-3 text-[0.8125rem] leading-relaxed text-ink-2">
         Demonstração: as contas de exemplo usam a palavra-passe{" "}
         <span className="font-mono text-ink">demo1234</span>, por exemplo o telefone{" "}
-        <span className="font-mono text-ink tabular">923 115 480</span>.
+        <span className="font-mono text-ink tabular">923 115 480</span> (particular) ou{" "}
+        <span className="font-mono text-ink tabular">912 870 233</span> (empresa).
       </p>
     </div>
   );
@@ -150,23 +165,27 @@ function RegisterForm() {
     register,
     handleSubmit,
     setError,
+    setValue,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { name: "", phone: "", password: "", email: "" },
+    defaultValues: { kind: "particular", companyName: "", nif: "", name: "", phone: "", password: "", email: "" },
   });
+  const empresa = useWatch({ control, name: "kind" }) === "empresa";
 
   const onSubmit = (v: RegisterValues) => {
-    // TEMPORARY (domain step): particular only; cliente worker adds the Particular / Empresa choice.
     const res = useStore.getState().registerClient({
-      kind: "particular",
+      kind: v.kind,
       name: v.name,
       phone: v.phone,
       password: v.password,
       email: v.email || undefined,
+      company: v.kind === "empresa" ? { name: v.companyName, nif: v.nif } : undefined,
     });
     if (!res.ok) {
       if (res.error.includes("telefone")) setError("phone", { message: res.error });
+      else if (res.error.includes("NIF")) setError("nif", { message: res.error });
       else toast.error(res.error);
       return;
     }
@@ -176,7 +195,61 @@ function RegisterForm() {
   const id = (k: string) => `${uid}-${k}`;
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-5">
-      <Field id={id("name")} label="Nome" error={errors.name?.message}>
+      <fieldset>
+        <legend className="mb-2 text-sm font-medium text-ink">A conta é para</legend>
+        <div role="radiogroup" aria-label="Tipo de cliente" className="grid grid-cols-2 gap-2">
+          {(["particular", "empresa"] as ClientKind[]).map((k) => {
+            const on = (k === "empresa") === empresa;
+            const Icon = k === "empresa" ? BuildingsIcon : UserIcon;
+            return (
+              <button
+                key={k}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => setValue("kind", k)}
+                className={cn(
+                  "press flex min-h-11 flex-col items-start gap-1 rounded-lg border px-3.5 py-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/40",
+                  on ? "border-ink bg-surface" : "border-line bg-paper hover-fine:border-ink/40",
+                )}
+              >
+                <span className="flex items-center gap-2 text-[0.9375rem] font-semibold text-ink">
+                  <Icon aria-hidden weight={on ? "fill" : "regular"} className="size-[1.125rem]" />
+                  {CLIENT_KIND[k].label}
+                </span>
+                <span className="text-[0.8125rem] leading-snug text-ink-2">{CLIENT_KIND[k].hint}</span>
+              </button>
+            );
+          })}
+        </div>
+      </fieldset>
+
+      {empresa && (
+        <>
+          <Field id={id("company")} label="Nome da empresa" error={errors.companyName?.message}>
+            <Input
+              id={id("company")}
+              autoComplete="organization"
+              placeholder="Ex.: Construções Kianda, Lda."
+              aria-invalid={!!errors.companyName || undefined}
+              aria-describedby={describedBy(id("company"), errors.companyName?.message, false)}
+              {...register("companyName")}
+            />
+          </Field>
+          <Field id={id("nif")} label="NIF" hint="Aparece no talão de cada pedido da empresa." error={errors.nif?.message}>
+            <Input
+              id={id("nif")}
+              inputMode="numeric"
+              className="font-mono tabular"
+              aria-invalid={!!errors.nif || undefined}
+              aria-describedby={describedBy(id("nif"), errors.nif?.message)}
+              {...register("nif")}
+            />
+          </Field>
+        </>
+      )}
+
+      <Field id={id("name")} label={empresa ? "Nome do responsável" : "Nome"} error={errors.name?.message}>
         <Input
           id={id("name")}
           autoComplete="name"
@@ -204,9 +277,14 @@ function RegisterForm() {
       </Field>
       <Field
         id={id("email")}
-        label="E-mail"
-        optional
-        hint="Só para recibos e avisos, se preferir."
+        label={
+          <>
+            E-mail
+            {empresa && <span className="text-xs font-normal text-ink-2">recomendado</span>}
+          </>
+        }
+        optional={!empresa}
+        hint={empresa ? "Para receber os avisos e talões da empresa." : "Só para recibos e avisos, se preferir."}
         error={errors.email?.message}
       >
         <Input
@@ -220,7 +298,7 @@ function RegisterForm() {
         />
       </Field>
       <Button type="submit" variant="tag" size="lg" disabled={isSubmitting} className="mt-1 w-full">
-        Criar conta
+        {empresa ? "Criar conta de empresa" : "Criar conta"}
       </Button>
     </form>
   );
